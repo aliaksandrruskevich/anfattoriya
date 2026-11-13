@@ -1,0 +1,30 @@
+# Зависимости
+node_modules/
+
+# Сборка Next.js
+.next/
+out/
+build/
+
+# Секреты
+.env
+.env.*
+!.env.example
+
+# Бэкапы и дампы (ВАЖНО!)
+*.bak
+*.bak-*
+*.tar.gz
+*.sql
+backup_*.json
+prod-backup-*.json
+slug-*.json
+duplicates.txt
+feed.xml
+tsconfig.tsbuildinfo
+firebase-applet-config.json
+env.txt
+
+# Прочее
+.DS_Store
+Thumbs.db
