@@ -27,4 +27,5 @@ env.txt
 
 # Прочее
 .DS_Store
-Thumbs.db
+Thumbs.dbphotos-backup.json
+slugs-before-migration.json
