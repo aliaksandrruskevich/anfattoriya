@@ -3,6 +3,7 @@ import 'dotenv/config';
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  serverExternalPackages: ['puppeteer'],
 
   // Проверка типов на билде. Раскомментируйте ignoreBuildErrors только если нужно срочно.
   // typescript: {

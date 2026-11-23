@@ -318,6 +318,9 @@ export default function KufarChatsWorkspace({
           return updated;
         });
         setReplyText('');
+        if (data?.deliveredToKufar) {
+          showToast('Ответ сохранён в CRM и отправлен клиенту на Kufar');
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         showToast(err?.error || 'Не удалось отправить сообщение');

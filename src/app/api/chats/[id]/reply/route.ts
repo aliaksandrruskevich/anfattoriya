@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { replyToKufarChat } from '@/lib/kufarChatsStore';
 import { requireCrmSession } from '@/lib/auth';
+import { getKufarCredentials } from '@/lib/kufarAuthConfig';
+import { sendReplyToKufarViaBrowser } from '@/lib/kufarLiveSync';
 
-// POST /api/chats/[id]/reply — отправка ответа от менеджера (CRM)
+// POST /api/chats/[id]/reply — отправка ответа от менеджера (CRM + доставка в Kufar при наличии .env)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,7 +26,13 @@ export async function POST(
       return NextResponse.json({ error: 'Чат не найден' }, { status: 404 });
     }
 
-    return NextResponse.json(result, { status: 201 });
+    let deliveredToKufar = false;
+    const { login, password } = getKufarCredentials();
+    if (login && password && id.startsWith('kufar-') && !id.startsWith('kufar-chat-10')) {
+      deliveredToKufar = await sendReplyToKufarViaBrowser(id, text).catch(() => false);
+    }
+
+    return NextResponse.json({ ...result, deliveredToKufar }, { status: 201 });
   } catch (error: any) {
     console.error('[POST /api/chats/[id]/reply]', error);
     return NextResponse.json({ error: error.message || 'Ошибка отправки ответа' }, { status: 500 });

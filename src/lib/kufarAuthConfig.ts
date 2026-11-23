@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -17,7 +18,7 @@ export interface KufarConfigStatus {
 
 /**
  * Читает логин и пароль Kufar из переменных окружения (.env).
- * Поддерживает основные ключи KUFAR_LOGIN / KUFAR_PASSWORD и распространённые алиасы.
+ * Поддерживает KUFAR_LOGIN / KUFAR_PASSWORD и распространённые алиасы.
  */
 export function getKufarCredentials(): KufarCredentials {
   const login = (
@@ -35,9 +36,16 @@ export function getKufarCredentials(): KufarCredentials {
     ''
   ).trim();
 
-  const syncSecret = (process.env.KUFAR_SYNC_SECRET || '').trim();
+  const explicitSecret = (process.env.KUFAR_SYNC_SECRET || '').trim();
+  const derivedSeed = password || process.env.SESSION_SECRET || '';
+  const syncSecret =
+    explicitSecret ||
+    (derivedSeed
+      ? crypto.createHmac('sha256', derivedSeed).update('fattoria-kufar-sync').digest('hex')
+      : '');
+
   const cookiesPath = path.resolve(
-    process.cwd(),
+    /*turbopackIgnore: true*/ process.cwd(),
     process.env.KUFAR_COOKIES_PATH || 'kufar-cookies.json'
   );
 
@@ -66,7 +74,7 @@ export function getKufarConfigStatus(): KufarConfigStatus {
   const configured = Boolean(login && password);
   let cookiesSaved = false;
   try {
-    cookiesSaved = fs.existsSync(cookiesPath);
+    cookiesSaved = fs.existsSync(/*turbopackIgnore: true*/ cookiesPath);
   } catch {
     cookiesSaved = false;
   }

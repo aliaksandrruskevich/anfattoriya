@@ -1,12 +1,28 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { syncKufarIncomingMessage, type SyncKufarPayload } from '@/lib/kufarChatsStore';
-import { getSessionAgent, verifySharedSecretHeader } from '@/lib/auth';
+import { getSessionAgent } from '@/lib/auth';
+import { getKufarCredentials } from '@/lib/kufarAuthConfig';
+
+function verifySyncAccess(request: NextRequest): boolean {
+  const { syncSecret } = getKufarCredentials();
+  if (!syncSecret) return false;
+
+  const provided =
+    request.headers.get('x-sync-secret') ||
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+    '';
+
+  const a = Buffer.from(provided.trim(), 'utf8');
+  const b = Buffer.from(syncSecret, 'utf8');
+  if (a.length !== b.length || a.length === 0) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 
 // POST /api/chats/sync — приём новых сообщений из парсера Kufar (Puppeteer)
 export async function POST(request: NextRequest) {
-  // Check either authenticated CRM session or KUFAR_SYNC_SECRET header
   const session = await getSessionAgent();
-  if (!session && !verifySharedSecretHeader(request, 'KUFAR_SYNC_SECRET')) {
+  if (!session && !verifySyncAccess(request)) {
     return NextResponse.json({ error: 'Недействительный секрет синхронизации' }, { status: 401 });
   }
 

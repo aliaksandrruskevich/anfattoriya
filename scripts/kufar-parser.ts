@@ -1,26 +1,17 @@
 /**
  * Kufar Messaging Scraper (Puppeteer) for Fattoria CRM
  *
- * Авторизуется на Kufar по логину и паролю из файла .env:
+ * Достаточно указать в файле .env только логин и пароль:
  *   KUFAR_LOGIN=...
  *   KUFAR_PASSWORD=...
  *
- * Также поддерживает кеширование cookies (kufar-cookies.json), чтобы не логиниться
- * при каждом опросе, с автоматическим повторным входом при истечении сессии.
- *
  * Запуск:
- *   npm install puppeteer
  *   npx tsx scripts/kufar-parser.ts
  *   npx tsx scripts/kufar-parser.ts --watch   (опрос каждые 30 секунд)
- *
- * Дополнительные переменные окружения (.env):
- *   CRM_API_URL=https://fattoria.by (по умолчанию http://localhost:3000)
- *   KUFAR_SYNC_SECRET=...
- *   KUFAR_COOKIES_PATH=./kufar-cookies.json
- *   KUFAR_POLL_INTERVAL_MS=30000
  */
 
 import dotenv from 'dotenv';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -62,6 +53,15 @@ const KUFAR_PASSWORD = (
   ''
 ).trim();
 
+function getSyncToken(): string {
+  const explicit = (process.env.KUFAR_SYNC_SECRET || '').trim();
+  if (explicit) return explicit;
+  const seed = KUFAR_PASSWORD || process.env.SESSION_SECRET || '';
+  return seed
+    ? crypto.createHmac('sha256', seed).update('fattoria-kufar-sync').digest('hex')
+    : '';
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -70,9 +70,7 @@ async function loadCookiesOptional(): Promise<any[] | null> {
   try {
     const raw = await fs.readFile(COOKIES_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return null;
-    }
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
     return parsed.map((c) => ({
       ...c,
       domain: c.domain || '.kufar.by',
@@ -91,200 +89,110 @@ async function saveCookies(page: any): Promise<void> {
         encoding: 'utf-8',
         mode: 0o600,
       });
-      console.log(`[Kufar Parser] Cookies сессии сохранены (${cookies.length} шт.)`);
     }
-  } catch (err: any) {
-    console.warn('[Kufar Parser] Не удалось сохранить cookies:', err.message);
+  } catch {
+    // ignore
   }
 }
 
-async function isLoginRequired(page: any): Promise<boolean> {
-  const url = page.url();
-  if (url.includes('login_popup') || url.includes('/login')) {
-    return true;
-  }
+async function dismissCookieBanner(page: any): Promise<void> {
+  await page
+    .evaluate(() => {
+      const closeBtn = document.querySelector('[data-testid="popup-close"]') as HTMLElement | null;
+      if (closeBtn) closeBtn.click();
+      const btns = Array.from(document.querySelectorAll('button'));
+      const accept = btns.find((b) =>
+        /^(принять|согласиться|принять все|ok|хорошо)$/i.test((b.innerText || '').trim())
+      );
+      if (accept) (accept as HTMLElement).click();
+    })
+    .catch(() => {});
+}
+
+async function isMessagingAuthenticated(page: any): Promise<boolean> {
   return await page.evaluate(() => {
-    const loginBtn = document.querySelector('[data-testid="login_button"]');
-    const passInput = document.querySelector('input[type="password"]');
-    const modal = document.querySelector('[data-testid="modal-container"]');
-    const modalText = (modal?.textContent || '').toLowerCase();
-    const hasLoginModal = Boolean(
-      modal && (modalText.includes('вход') || modalText.includes('войти') || modalText.includes('парол'))
+    const hasLoginBtn = Boolean(document.querySelector('[data-testid="login_button"]'));
+    const hasGuestBtn = Array.from(document.querySelectorAll('button')).some(
+      (b) => (b.innerText || '').trim() === 'Войти'
     );
-    return Boolean(loginBtn || passInput || hasLoginModal);
+    const hasPassInput = Boolean(document.querySelector('input[name="password"], input[type="password"]'));
+    return !hasLoginBtn && !hasGuestBtn && !hasPassInput;
   });
-}
-
-async function findFirstVisibleSelector(page: any, selectors: string[]): Promise<string | null> {
-  for (const sel of selectors) {
-    const handle = await page.$(sel);
-    if (!handle) continue;
-    const isVisible = await page.evaluate((el: HTMLElement) => {
-      const style = window.getComputedStyle(el);
-      const rect = el.getBoundingClientRect();
-      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
-    }, handle);
-    if (isVisible) return sel;
-  }
-  return null;
 }
 
 async function loginToKufar(page: any): Promise<void> {
   if (!KUFAR_LOGIN || !KUFAR_PASSWORD) {
-    throw new Error(
-      'Не заданы KUFAR_LOGIN и KUFAR_PASSWORD в файле .env (и отсутствуют действительные cookies).'
-    );
+    throw new Error('Укажите KUFAR_LOGIN и KUFAR_PASSWORD в файле .env.');
   }
 
-  console.log('[Kufar Parser] Выполняю вход на Kufar по логину и паролю из .env...');
+  console.log('[Kufar Parser] Вхожу на Kufar по логину и паролю из .env...');
 
-  // Открываем страницу сообщений (или нажимаем кнопку входа, если попап еще не открыт)
-  if (!page.url().includes('kufar.by')) {
-    await page.goto('https://www.kufar.by/account/messaging/', {
-      waitUntil: 'networkidle2',
-      timeout: 60000,
-    });
-  }
+  await page.goto('https://www.kufar.by/l', { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await sleep(2500);
+  await dismissCookieBanner(page);
+  await sleep(600);
 
   const loginBtn = await page.$('[data-testid="login_button"]');
   if (loginBtn) {
     await loginBtn.click().catch(() => {});
-    await sleep(1000);
+    await sleep(2000);
   }
 
-  // Если форма входа ещё не появилась, переходим напрямую на URL с login_popup=1
-  const initialInput = await findFirstVisibleSelector(page, [
-    '[data-testid="modal-container"] input[name="login"]',
-    '[data-testid="modal-container"] input[name="email"]',
-    '[data-testid="modal-container"] input[type="email"]',
-    '[data-testid="modal-container"] input[type="tel"]',
-    '[data-testid="modal-container"] input[type="text"]',
-    'input[name="login"]',
-    'input[name="email"]',
-    'input[type="email"]',
-    'input[autocomplete="username"]',
-  ]);
-
-  if (!initialInput) {
+  let hasLoginInput = await page.$('input[name="login"]');
+  if (!hasLoginInput) {
     await page.goto('https://www.kufar.by/l?login_popup=1', {
-      waitUntil: 'networkidle2',
-      timeout: 60000,
+      waitUntil: 'domcontentloaded',
+      timeout: 45000,
     });
-    await sleep(1200);
-  }
-
-  const loginSelectors = [
-    '[data-testid="modal-container"] input[name="login"]',
-    '[data-testid="modal-container"] input[name="email"]',
-    '[data-testid="modal-container"] input[type="email"]',
-    '[data-testid="modal-container"] input[type="tel"]',
-    '[data-testid="modal-container"] input[autocomplete="username"]',
-    '[data-testid="modal-container"] input[type="text"]',
-    'input[name="login"]',
-    'input[name="email"]',
-    'input[type="email"]',
-    'input[autocomplete="username"]',
-  ];
-
-  const loginSel = await findFirstVisibleSelector(page, loginSelectors);
-  if (!loginSel) {
-    throw new Error('Не найдено поле ввода логина на странице авторизации Kufar.');
-  }
-
-  await page.click(loginSel, { clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await page.type(loginSel, KUFAR_LOGIN, { delay: 35 });
-
-  // Проверяем, видно ли сразу поле пароля, или вход двухшаговый (сначала логин -> далее -> пароль)
-  const passwordSelectors = [
-    '[data-testid="modal-container"] input[type="password"]',
-    '[data-testid="modal-container"] input[name="password"]',
-    'input[type="password"]',
-    'input[name="password"]',
-  ];
-
-  let passSel = await findFirstVisibleSelector(page, passwordSelectors);
-  if (!passSel) {
-    const nextBtnSel = await findFirstVisibleSelector(page, [
-      '[data-testid="modal-container"] button[type="submit"]',
-      'form button[type="submit"]',
-    ]);
-    if (nextBtnSel) {
-      await page.click(nextBtnSel);
-      await sleep(1500);
-      passSel = await findFirstVisibleSelector(page, passwordSelectors);
+    await sleep(2500);
+    await dismissCookieBanner(page);
+    await sleep(800);
+    const popupBtn = await page.$('[data-testid="login_button"]');
+    if (popupBtn) {
+      await popupBtn.click().catch(() => {});
+      await sleep(1800);
     }
+    hasLoginInput = await page.$('input[name="login"]');
   }
 
-  if (!passSel) {
-    throw new Error('Не найдено поле ввода пароля на форме входа Kufar.');
-  }
+  const loginSelector = hasLoginInput
+    ? 'input[name="login"]'
+    : 'input[name="email"], input[type="email"], input[autocomplete="username"]';
 
-  await page.click(passSel, { clickCount: 3 });
+  await page.waitForSelector(loginSelector, { visible: true, timeout: 15000 });
+  await page.click(loginSelector, { clickCount: 3 });
   await page.keyboard.press('Backspace');
-  await page.type(passSel, KUFAR_PASSWORD, { delay: 35 });
+  await page.type(loginSelector, KUFAR_LOGIN, { delay: 30 });
 
-  const submitSel = await findFirstVisibleSelector(page, [
-    '[data-testid="modal-container"] button[type="submit"]',
-    'form button[type="submit"]',
-  ]);
+  const passSelector = 'input[name="password"], input[type="password"]';
+  await page.waitForSelector(passSelector, { visible: true, timeout: 10000 });
+  await page.click(passSelector, { clickCount: 3 });
+  await page.keyboard.press('Backspace');
+  await page.type(passSelector, KUFAR_PASSWORD, { delay: 30 });
 
-  if (submitSel) {
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {}),
-      page.click(submitSel),
-    ]);
-  } else {
-    await page.keyboard.press('Enter');
-    await sleep(3000);
-  }
+  await page.evaluate(() => {
+    const passEl = document.querySelector('input[name="password"], input[type="password"]');
+    const form = passEl?.closest('form');
+    const submitBtn =
+      (form?.querySelector('button[type="submit"]') as HTMLElement | null) ||
+      (Array.from(document.querySelectorAll('button[type="submit"]')).find(
+        (b) => /войти|вход/i.test((b as HTMLElement).innerText || '')
+      ) as HTMLElement | undefined);
+    if (submitBtn) submitBtn.click();
+  });
 
+  await sleep(4000);
+  await page
+    .goto('https://www.kufar.by/account/messaging/', { waitUntil: 'networkidle2', timeout: 45000 })
+    .catch(() => {});
   await sleep(2500);
 
-  // Проверяем, не запросил ли Kufar капчу / SMS-код или не вернул ошибку пароля
-  const authIssue = await page.evaluate(() => {
-    const modal = document.querySelector('[data-testid="modal-container"]');
-    const text = (modal?.textContent || document.body?.innerText || '').toLowerCase();
-    if (text.includes('неверный') || text.includes('ошибка авторизации')) {
-      return 'Kufar отклонил логин или пароль. Проверьте KUFAR_LOGIN и KUFAR_PASSWORD в .env.';
-    }
-    if (text.includes('подтверд') && (text.includes('смс') || text.includes('код'))) {
-      return 'Kufar запросил одноразовый SMS-код/подтверждение. Пройдите вход один раз вручную или сохраните cookies.';
-    }
-    if (document.querySelector('iframe[src*="captcha"], iframe[src*="recaptcha"]')) {
-      return 'Kufar показал CAPTCHA. Пройдите проверку вручную или обновите kufar-cookies.json.';
-    }
-    return null;
-  });
-
-  if (authIssue) {
-    throw new Error(authIssue);
-  }
-
-  await page.goto('https://www.kufar.by/account/messaging/', {
-    waitUntil: 'networkidle2',
-    timeout: 60000,
-  });
-
-  if (await isLoginRequired(page)) {
-    throw new Error('После отправки формы входа Kufar сессия не подтверждена.');
+  if (!(await isMessagingAuthenticated(page))) {
+    throw new Error('Не удалось подтвердить вход на Kufar по данным из .env.');
   }
 
   await saveCookies(page);
-  console.log('[Kufar Parser] Успешный вход на Kufar по данным из .env!');
-}
-
-async function ensureAuthenticated(page: any): Promise<void> {
-  await page.goto('https://www.kufar.by/account/messaging/', {
-    waitUntil: 'networkidle2',
-    timeout: 60000,
-  });
-  await sleep(1500);
-
-  if (await isLoginRequired(page)) {
-    console.log('[Kufar Parser] Требуется авторизация на Kufar...');
-    await loginToKufar(page);
-  }
+  console.log('[Kufar Parser] Вход на Kufar выполнен успешно!');
 }
 
 async function loadSyncedIds(): Promise<Set<string>> {
@@ -315,8 +223,9 @@ async function sendToCrm(messages: ScrapedMessage[]): Promise<void> {
   if (!messages.length) return;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (process.env.KUFAR_SYNC_SECRET) {
-    headers['x-sync-secret'] = process.env.KUFAR_SYNC_SECRET;
+  const token = getSyncToken();
+  if (token) {
+    headers['x-sync-secret'] = token;
   }
 
   const res = await fetch(`${CRM_API_URL}/api/chats/sync`, {
@@ -337,17 +246,18 @@ async function sendToCrm(messages: ScrapedMessage[]): Promise<void> {
 }
 
 async function scrapeKufarOnce(page: any, syncedIds: Set<string>): Promise<void> {
-  console.log('[Kufar Parser] Проверяю сессию и открываю сообщения Kufar...');
-  await ensureAuthenticated(page);
-
   await page
-    .waitForSelector(
-      '[data-testid*="dialog"], [class*="dialog"], [class*="conversation"], a[href*="/account/messaging/"]',
-      { timeout: 15000 }
-    )
-    .catch(() => {
-      console.warn('[Kufar Parser] Список диалогов не появился за 15 сек (проверьте наличие чатов).');
-    });
+    .goto('https://www.kufar.by/account/messaging/', { waitUntil: 'networkidle2', timeout: 45000 })
+    .catch(() => {});
+  await sleep(2500);
+
+  if (!(await isMessagingAuthenticated(page))) {
+    await loginToKufar(page);
+  } else {
+    await saveCookies(page);
+  }
+
+  await page.waitForSelector('a[href*="/account/messaging/"]', { timeout: 12000 }).catch(() => {});
 
   const dialogLinks: { href: string; clientName: string; adTitle: string }[] = await page.evaluate(() => {
     const items: { href: string; clientName: string; adTitle: string }[] = [];
@@ -377,7 +287,7 @@ async function scrapeKufarOnce(page: any, syncedIds: Set<string>): Promise<void>
 
   for (const dialog of dialogLinks) {
     try {
-      await page.goto(dialog.href, { waitUntil: 'networkidle2', timeout: 45000 });
+      await page.goto(dialog.href, { waitUntil: 'networkidle2', timeout: 45000 }).catch(() => {});
       await sleep(1200);
 
       const chatMatch = dialog.href.match(/\/account\/messaging\/([^/?#]+)/i);
@@ -417,10 +327,7 @@ async function scrapeKufarOnce(page: any, syncedIds: Set<string>): Promise<void>
               testId.includes('outgoing') ||
               styleAlign === 'flex-end';
 
-            return {
-              sender: isAgent ? ('agent' as const) : ('client' as const),
-              text,
-            };
+            return { sender: isAgent ? ('agent' as const) : ('client' as const), text };
           })
           .filter(Boolean) as { sender: 'client' | 'agent'; text: string }[];
 
@@ -465,30 +372,21 @@ async function scrapeKufarOnce(page: any, syncedIds: Set<string>): Promise<void>
 async function main() {
   const cookies = await loadCookiesOptional();
   if (!cookies && (!KUFAR_LOGIN || !KUFAR_PASSWORD)) {
-    console.error(
-      '[Kufar Parser] Укажите KUFAR_LOGIN и KUFAR_PASSWORD в файле .env (или экспортируйте kufar-cookies.json).'
-    );
+    console.error('[Kufar Parser] Укажите KUFAR_LOGIN и KUFAR_PASSWORD в файле .env.');
     process.exit(1);
   }
 
   const syncedIds = await loadSyncedIds();
-
-  let puppeteer: any;
-  try {
-    const modName = 'puppeteer';
-    puppeteer = (await import(modName)).default;
-  } catch {
-    console.error('[Kufar Parser] Пакет puppeteer не установлен. Установите: npm install puppeteer');
-    process.exit(1);
-  }
+  const puppeteer = (await import('puppeteer')).default;
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
   try {
     const page = await browser.newPage();
+    await page.setViewport({ width: 1366, height: 900 });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
     );
