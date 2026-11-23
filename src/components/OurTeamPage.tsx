@@ -22,6 +22,7 @@ export default function OurTeamPage({
 }: OurTeamPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'sale' | 'rent' | 'assessment'>('all');
+  const [heroSent, setHeroSent] = useState(false);
   useFonts();
 
   const handleHeroSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -33,7 +34,8 @@ export default function OurTeamPage({
     if (phone) {
       handleAddLead(name, phone, `Задача: ${task || 'Консультация с риэлтером'}`, 'Наша команда: баннер');
       form.reset();
-      alert('Спасибо! Мы подберем профильного риэлтера для решения вашей задачи.');
+      setHeroSent(true);
+      setTimeout(() => setHeroSent(false), 5000);
     }
   };
 
@@ -136,6 +138,11 @@ export default function OurTeamPage({
                 Подобрать риэлтера
               </button>
             </form>
+            {heroSent && (
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-purple-600/25 border border-purple-400/40 text-purple-100 text-xs font-medium">
+                Спасибо! Мы подберём профильного риэлтера и свяжемся с вами в ближайшее время.
+              </div>
+            )}
           </div>
         </div>
       </div>

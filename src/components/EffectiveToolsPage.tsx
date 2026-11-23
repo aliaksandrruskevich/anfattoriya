@@ -34,7 +34,7 @@ export default function EffectiveToolsPage({ handleAddLead }: EffectiveToolsPage
     {
       icon: <BarChart3 className="w-6 h-6" />,
       title: 'SEO-продвижение',
-      desc: '105 000+ посетителей в месяц из поисковых систем. ',
+      desc: 'Целевые покупатели находят объекты через поисковые системы и каталог агентства.',
     },
     {
       icon: <Smartphone className="w-6 h-6" />,
@@ -84,9 +84,9 @@ export default function EffectiveToolsPage({ handleAddLead }: EffectiveToolsPage
             </form>
 
             <div className="flex flex-wrap gap-x-6 gap-y-2 mt-6 text-[11px] text-white/50">
-              <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" style={{ color: brass }} /> 8 площадок</span>
-              <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" style={{ color: brass }} /> </span>
-              <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" style={{ color: brass }} /> 105 000+ посетителей/мес</span>
+              <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" style={{ color: brass }} /> Ведущие площадки</span>
+              <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" style={{ color: brass }} /> 1424+ клиентов выбрали нас</span>
+              <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" style={{ color: brass }} /> Средний срок — 26 дней (мин. 2 дня)</span>
             </div>
           </div>
         </div>

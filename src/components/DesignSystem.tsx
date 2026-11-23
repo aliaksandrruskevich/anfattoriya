@@ -28,30 +28,10 @@ interface RevealProps {
 
 export function Reveal({ children, className = '', style, delay = 0 }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    // Safety fallback: ensure content is never permanently hidden
-    const timer = setTimeout(() => setVisible(true), 150 + delay);
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      setVisible(true);
-      return () => clearTimeout(timer);
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.01, rootMargin: '50px' }
-    );
-    io.observe(el);
-    return () => {
-      clearTimeout(timer);
-      io.disconnect();
-    };
+    setVisible(true);
   }, [delay]);
 
   return (
@@ -60,8 +40,8 @@ export function Reveal({ children, className = '', style, delay = 0 }: RevealPro
       className={className}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(16px)',
-        transition: `opacity 0.6s cubic-bezier(.16,1,.3,1) ${delay}ms, transform 0.6s cubic-bezier(.16,1,.3,1) ${delay}ms`,
+        transform: 'translateY(0)',
+        transition: `opacity 0.5s cubic-bezier(.16,1,.3,1) ${delay}ms, transform 0.5s cubic-bezier(.16,1,.3,1) ${delay}ms`,
         ...style,
       }}
     >
@@ -176,7 +156,7 @@ export function InlineLeadForm({
       />
       <button
         type="submit"
-        className="px-7 py-3.5 text-stone-950 text-xs font-bold uppercase tracking-wider rounded-lg transition-all hover:brightness-105 hover:-translate-y-0.5 shadow-[0_4px_16px_rgba(139, 92, 246,0.3)] whitespace-nowrap cursor-pointer"
+        className="px-7 py-3.5 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all hover:brightness-110 hover:-translate-y-0.5 shadow-[0_4px_16px_rgba(139,92,246,0.3)] whitespace-nowrap cursor-pointer"
         style={{ backgroundColor: brass }}
       >
         {ctaLabel}

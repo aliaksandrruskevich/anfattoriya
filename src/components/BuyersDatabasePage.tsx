@@ -240,16 +240,12 @@ export default function BuyersDatabasePage({
     };
 
     const matches = getMatchingProperties(createdReq);
-    if (matches.length > 0) {
-      setNewBuyerMatchNotification({
-        buyerName: newBuyerObj.name,
-        count: matches.length,
-        matches: matches
-      });
-      setViewingMatchesBuyer(createdReq);
-    } else {
-      alert(`Покупатель ${newBuyerName || 'внесен'} успешно зарегистрирован! Заявка мгновенно опубликована в базе и синхронизирована с CRM.`);
-    }
+    setNewBuyerMatchNotification({
+      buyerName: newBuyerObj.name,
+      count: matches.length,
+      matches: matches
+    });
+    setViewingMatchesBuyer(createdReq);
 
     setIsAddBuyerModalOpen(false);
     // Reset form

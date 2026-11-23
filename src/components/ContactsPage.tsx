@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState } from 'react';
 import { PageId } from '../types';
 import {
   MapPin, Phone, Mail, Clock, Building2, FileText, Shield,
@@ -19,12 +19,13 @@ const bodyFont = "'Raleway', system-ui, sans-serif";
 const HERO_PHOTO = '/photo/stati.jpg';
 
 export default function ContactsPage({ activePage, navigateTo, handleAddLead }: ContactsPageProps) {
+  const [formSent, setFormSent] = useState(false);
   const scrollToForm = () => {
     document.getElementById('contact-form-section')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <div className="min-h-screen bg-[#FBF9F5] text-[#171412]" style={{ fontFamily: bodyFont }}>
+    <div className="min-h-screen bg-[#FAF8FC] text-[#171412]" style={{ fontFamily: bodyFont }}>
 
       {/* HERO BANNER */}
       <section className="relative overflow-hidden bg-neutral-950 text-white min-h-[520px] lg:min-h-[620px] flex items-end">
@@ -43,7 +44,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
           <div className="max-w-4xl">
             <div className="inline-flex items-center gap-2.5 bg-white/10 backdrop-blur-md border border-white/25 text-white px-4 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.25em] mb-6">
-              <Building2 className="w-3.5 h-3.5 text-amber-400" />
+              <Building2 className="w-3.5 h-3.5 text-purple-400" />
               <span>АН «Фаттория» · Контактная информация</span>
             </div>
 
@@ -68,17 +69,17 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
               <span className="inline-flex items-center gap-2 font-medium">
-                <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                <MapPin className="w-3.5 h-3.5 text-purple-400" />
                 г. Минск, ул. Репина, д. 4, пом. 458
               </span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium">
-                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <Clock className="w-3.5 h-3.5 text-purple-300" />
                 пн–пт: 9:00 — 21:00
               </span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium">
-                <CheckCircle className="w-3.5 h-3.5 text-amber-300" />
+                <CheckCircle className="w-3.5 h-3.5 text-purple-300" />
                 Лицензия № 02240/446
               </span>
             </div>
@@ -107,7 +108,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                     onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
                     className="flex w-full items-start gap-2.5 text-left text-[13px] leading-snug py-2 px-2.5 rounded-lg transition-all hover:text-stone-900 cursor-pointer text-[#6B645C]"
                   >
-                    <span className="mt-[2px] text-[10px] font-semibold tabular-nums text-amber-800">
+                    <span className="mt-[2px] text-[10px] font-semibold tabular-nums text-purple-700">
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span>{item.label}</span>
@@ -140,8 +141,8 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
               </div>
             </div>
 
-            <div className="p-5 bg-gradient-to-br from-amber-50 to-stone-100 rounded-2xl border border-amber-200/70 text-stone-800">
-              <div className="flex items-center gap-2 text-amber-800 text-[11px] font-bold uppercase tracking-wider mb-2">
+            <div className="p-5 bg-gradient-to-br from-purple-50 to-stone-50 rounded-2xl border border-purple-200/70 text-stone-800">
+              <div className="flex items-center gap-2 text-purple-800 text-[11px] font-bold uppercase tracking-wider mb-2">
                 <Award className="w-4 h-4" /> Лицензия и страхование
               </div>
               <p className="text-xs leading-relaxed text-stone-600 mt-2">
@@ -158,7 +159,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
             {/* 01: КОНТАКТНАЯ ИНФОРМАЦИЯ */}
             <section id="contact-info" className="scroll-mt-32">
-              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                 01 · Как с нами связаться
               </div>
               <h2
@@ -186,16 +187,16 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                     </div>
                   </div>
                   <div className="space-y-2.5 pl-16">
-                    <a href="tel:+375296380053" className="block text-amber-800 font-semibold text-lg hover:text-amber-900 transition-colors">
+                    <a href="tel:+375296380053" className="block text-purple-700 font-semibold text-lg hover:text-purple-900 transition-colors">
                       +375 29 638-00-53
                     </a>
                     <p className="text-sm text-stone-500">+375 29 638-00-53 (колл-центр)</p>
                     <p className="text-sm text-stone-500">+375 17 364-21-99 (городской)</p>
                     <div className="flex flex-wrap gap-3 pt-2">
-                      <a href="viber://chat?number=%2B375296380053" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-amber-800 transition">
+                      <a href="viber://chat?number=%2B375296380053" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-purple-700 transition">
                         <MessageCircle className="w-3.5 h-3.5" /> Viber
                       </a>
-                      <a href="https://t.me/fattoriaminsk" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-amber-800 transition">
+                      <a href="https://t.me/fattoriaminsk" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-purple-700 transition">
                         <Send className="w-3.5 h-3.5" /> Telegram
                       </a>
                     </div>
@@ -203,10 +204,10 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                 </article>
 
                 {/* Отдел аренды и оценки */}
-                <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm hover:shadow-md transition-all">
+                <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm hover:shadow-md hover:border-purple-200 transition-all">
                   <div className="flex items-start gap-4 mb-5">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-stone-50 border border-stone-200">
-                      <Building2 className="w-5 h-5 text-stone-700" />
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-purple-50 border border-purple-200">
+                      <Building2 className="w-5 h-5 text-purple-700" />
                     </div>
                     <div>
                       <h3 className="text-lg font-normal text-stone-900 mb-1" style={{ fontFamily: displayFont }}>
@@ -216,15 +217,15 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                     </div>
                   </div>
                   <div className="space-y-2.5 pl-16">
-                    <a href="tel:+375296380053" className="block text-amber-800 font-semibold text-lg hover:text-amber-900 transition-colors">
+                    <a href="tel:+375296380053" className="block text-purple-700 font-semibold text-lg hover:text-purple-900 transition-colors">
                       +375 29 638-00-53
                     </a>
                     <p className="text-sm text-stone-500">+375 29 638-00-53 (консультации)</p>
                     <div className="flex flex-wrap gap-3 pt-2">
-                      <a href="viber://chat?number=%2B375296380053" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-amber-800 transition">
+                      <a href="viber://chat?number=%2B375296380053" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-purple-700 transition">
                         <MessageCircle className="w-3.5 h-3.5" /> Viber
                       </a>
-                      <a href="https://t.me/fattoriaminsk" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-amber-800 transition">
+                      <a href="https://t.me/fattoriaminsk" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-purple-700 transition">
                         <Send className="w-3.5 h-3.5" /> Telegram
                       </a>
                     </div>
@@ -232,10 +233,10 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                 </article>
 
                 {/* E-mail */}
-                <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm hover:shadow-md transition-all">
+                <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm hover:shadow-md hover:border-purple-200 transition-all">
                   <div className="flex items-start gap-4 mb-5">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-stone-50 border border-stone-200">
-                      <Mail className="w-5 h-5 text-stone-700" />
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-purple-50 border border-purple-200">
+                      <Mail className="w-5 h-5 text-purple-700" />
                     </div>
                     <div>
                       <h3 className="text-lg font-normal text-stone-900 mb-1" style={{ fontFamily: displayFont }}>
@@ -245,7 +246,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                     </div>
                   </div>
                   <div className="pl-16">
-                    <a href="mailto:fattoria1900088@gmail.com" className="text-amber-800 font-medium hover:underline">
+                    <a href="mailto:fattoria1900088@gmail.com" className="text-purple-700 font-medium hover:underline">
                       fattoria1900088@gmail.com
                     </a>
                   </div>
@@ -275,7 +276,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
             {/* 02: АДРЕС И РЕКВИЗИТЫ */}
             <section id="contact-details" className="scroll-mt-32 pt-8 border-t border-stone-200">
-              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                 02 · Юридическая информация
               </div>
               <h2
@@ -288,7 +289,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
-                    <MapPin className="w-5 h-5 text-amber-800" />
+                    <MapPin className="w-5 h-5 text-purple-700" />
                     <h3 className="text-base font-semibold text-stone-900">Адрес офиса</h3>
                   </div>
                   <p className="text-sm text-stone-600 leading-relaxed">
@@ -300,7 +301,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
                 <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
-                    <CreditCard className="w-5 h-5 text-amber-800" />
+                    <CreditCard className="w-5 h-5 text-purple-700" />
                     <h3 className="text-base font-semibold text-stone-900">Банковские реквизиты</h3>
                   </div>
                   <p className="text-sm text-stone-600 leading-relaxed">
@@ -312,7 +313,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
                 <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
-                    <FileText className="w-5 h-5 text-amber-800" />
+                    <FileText className="w-5 h-5 text-purple-700" />
                     <h3 className="text-base font-semibold text-stone-900">Реквизиты компании</h3>
                   </div>
                   <p className="text-sm text-stone-600 leading-relaxed">
@@ -324,7 +325,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
                 <article className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
-                    <Shield className="w-5 h-5 text-amber-800" />
+                    <Shield className="w-5 h-5 text-purple-700" />
                     <h3 className="text-base font-semibold text-stone-900">Лицензия и страхование</h3>
                   </div>
                   <p className="text-sm text-stone-600 leading-relaxed">
@@ -337,7 +338,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
             {/* 03: ФОРМА ЗАЯВКИ */}
             <section id="contact-form-section" className="scroll-mt-32 pt-8 border-t border-stone-200">
-              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                 03 · Обратная связь
               </div>
               <h2
@@ -356,9 +357,12 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                   const form = e.currentTarget;
                   const name = (form.querySelector('[name="name"]') as HTMLInputElement)?.value || '';
                   const phone = (form.querySelector('[name="phone"]') as HTMLInputElement)?.value || '';
+                  const comment = (form.querySelector('[name="comment"]') as HTMLTextAreaElement)?.value.trim() || '';
                   if (phone) {
-                    handleAddLead(name, phone, 'Обратная связь (контакты)', 'kontakty');
+                    handleAddLead(name, phone, comment ? `Обратная связь: ${comment}` : 'Обратная связь (контакты)', 'kontakty');
                     form.reset();
+                    setFormSent(true);
+                    setTimeout(() => setFormSent(false), 6000);
                   }
                 }}
                 className="p-7 bg-white rounded-3xl border border-stone-200 shadow-sm space-y-5"
@@ -372,7 +376,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                       name="name"
                       type="text"
                       placeholder="Александр"
-                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800"
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-purple-500"
                     />
                   </div>
                   <div>
@@ -384,7 +388,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                       type="tel"
                       required
                       placeholder="+375 (29) 000-00-00"
-                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800"
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-purple-500"
                     />
                   </div>
                 </div>
@@ -394,25 +398,32 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                     Комментарий
                   </label>
                   <textarea
+                    name="comment"
                     placeholder="Опишите ваш вопрос или задачу..."
                     rows={4}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-stone-800 resize-none"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-purple-500 resize-none"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 px-4 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-purple-600/20 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>Отправить заявку</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
+                {formSent && (
+                  <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-800 text-xs font-medium flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-purple-600 shrink-0" />
+                    Спасибо! Ваша заявка отправлена — мы свяжемся с вами в ближайшее время.
+                  </div>
+                )}
               </form>
             </section>
 
             {/* 04: КАРТА */}
             <section id="map-section" className="scroll-mt-32 pt-8 border-t border-stone-200">
-              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                 04 · Как нас найти
               </div>
               <h2
@@ -439,7 +450,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
           <aside className="order-3 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-28 xl:h-fit space-y-6">
 
             <div className="p-7 bg-white rounded-3xl border border-stone-200 shadow-md">
-              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-amber-800 mb-2">
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-700 mb-2">
                 Быстрая связь
               </div>
               <h3 className="text-stone-900 text-xl font-normal mb-2" style={{ fontFamily: displayFont }}>
@@ -451,7 +462,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
 
               <a
                 href="tel:+375296380053"
-                className="block w-full py-3.5 px-4 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer text-center mb-3"
+                className="block w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-purple-600/20 cursor-pointer text-center mb-3"
               >
                 +375 29 638-00-53
               </a>
@@ -461,7 +472,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                   href="viber://chat?number=%2B375296380053"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-3 px-3 text-[11px] font-semibold uppercase tracking-wider rounded-xl border border-stone-300 bg-white hover:border-stone-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-3 px-3 text-[11px] font-semibold uppercase tracking-wider rounded-xl border border-stone-300 bg-white hover:border-purple-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-stone-600" />
                   <span>Viber</span>
@@ -470,7 +481,7 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
                   href="https://t.me/fattoriaminsk"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-3 px-3 text-[11px] font-semibold uppercase tracking-wider rounded-xl border border-stone-300 bg-white hover:border-stone-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-3 px-3 text-[11px] font-semibold uppercase tracking-wider rounded-xl border border-stone-300 bg-white hover:border-purple-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5 text-stone-600" />
                   <span>Telegram</span>
@@ -478,8 +489,8 @@ export default function ContactsPage({ activePage, navigateTo, handleAddLead }: 
               </div>
             </div>
 
-            <div className="p-6 bg-gradient-to-br from-amber-50 to-stone-100 rounded-3xl border border-amber-200/70">
-              <div className="flex items-center gap-2 text-amber-800 text-[11px] font-bold uppercase tracking-wider mb-3">
+            <div className="p-6 bg-gradient-to-br from-purple-50 to-stone-100 rounded-3xl border border-purple-200/70">
+              <div className="flex items-center gap-2 text-purple-800 text-[11px] font-bold uppercase tracking-wider mb-3">
                 <MapPin className="w-4 h-4" /> Адрес офиса
               </div>
               <p className="text-sm text-stone-900 font-medium mb-1">

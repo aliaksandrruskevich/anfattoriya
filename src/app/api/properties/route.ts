@@ -1,6 +1,9 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { execute, queryOne } from '@/lib/db';
+import { execute, isDbMockMode, queryOne } from '@/lib/db';
 import { getProperties } from '@/lib/repository';
+import { getSessionAgent, requireCrmSession } from '@/lib/auth';
+import { getMockStore } from '@/lib/mockStore';
+import { isPublicProperty, sanitizePropertyForPublic } from '@/lib/sanitize';
 
 // GET /api/properties?type=apartment&status=active&agentId=...&limit=50
 export async function GET(request: NextRequest) {
@@ -12,16 +15,34 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get('limit');
     const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
-    const properties = await getProperties({ type, status, agentId, limit });
-    return NextResponse.json(properties);
+    const session = await getSessionAgent();
+    const properties = await getProperties({
+      type,
+      status: session ? status : 'active',
+      agentId,
+      limit: session ? limit : undefined,
+    });
+
+    if (session) {
+      return NextResponse.json(properties);
+    }
+
+    const publicProps = properties
+      .filter(isPublicProperty)
+      .slice(0, limit || properties.length)
+      .map(sanitizePropertyForPublic);
+    return NextResponse.json(publicProps);
   } catch (error: any) {
     console.error('[GET /api/properties]', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// POST /api/properties — создать объект вручную (через CRM)
+// POST /api/properties — создать объект (только авторизованный сотрудник CRM)
 export async function POST(request: NextRequest) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json();
 
@@ -30,6 +51,33 @@ export async function POST(request: NextRequest) {
     }
 
     const id = body.id || `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (isDbMockMode()) {
+      const store = getMockStore();
+      const created = {
+        ...body,
+        id,
+        title: String(body.title),
+        type: body.type,
+        address: body.address || '',
+        priceBYN: Number(body.priceBYN ?? 0),
+        priceUSD: Number(body.priceUSD ?? 0),
+        area: Number(body.area ?? 0),
+        photo: body.photo || '/photo/properties/kvartira-minsk-pritytskogo-29.webp',
+        features: Array.isArray(body.features) ? body.features : [],
+        status: body.status ?? 'active',
+        isPublished: Boolean(body.isPublished),
+        internalOnly: Boolean(body.internalOnly),
+        crmOnly: Boolean(body.crmOnly),
+        isClosedBase: Boolean(body.isClosedBase),
+        assignedAgentId: body.assignedAgentId ?? auth.agent.id,
+        assignedAgentName: body.assignedAgentName ?? auth.agent.name,
+        sourceType: body.sourceType ?? 'manual',
+        source: body.source ?? 'crm',
+      };
+      store.properties.unshift(created);
+      return NextResponse.json(created, { status: 201 });
+    }
 
     await execute(
       `INSERT INTO properties (
@@ -62,8 +110,8 @@ export async function POST(request: NextRequest) {
         body.agentName ?? null,
         body.agentPhone ?? null,
         body.agentPhoto ?? null,
-        body.assignedAgentId ?? null,
-        body.assignedAgentName ?? null,
+        body.assignedAgentId ?? auth.agent.id,
+        body.assignedAgentName ?? auth.agent.name,
         body.sellerPhone ?? null,
         body.priority ?? null,
         body.location ?? null,

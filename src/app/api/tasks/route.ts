@@ -1,13 +1,20 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { execute, queryOne } from '@/lib/db';
+import { execute, isDbMockMode, queryOne } from '@/lib/db';
 import { getTasks } from '@/lib/repository';
+import { isAdminRole, requireCrmSession } from '@/lib/auth';
+import { getMockStore } from '@/lib/mockStore';
+import type { CRMTask } from '@/types';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { searchParams } = new URL(request.url);
-    const agentId = searchParams.get('agentId') || undefined;
+    const requestedAgentId = searchParams.get('agentId') || undefined;
+    const isAdmin = isAdminRole(auth.agent);
 
-    const tasks = await getTasks(agentId);
+    const tasks = await getTasks(isAdmin ? requestedAgentId : auth.agent.id);
     return NextResponse.json(tasks);
   } catch (error: any) {
     console.error('[GET /api/tasks]', error);
@@ -16,14 +23,44 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json();
 
-    if (!body.title || !body.agentId) {
-      return NextResponse.json({ error: 'Поля title и agentId обязательны' }, { status: 400 });
+    if (!body.title) {
+      return NextResponse.json({ error: 'Поле title обязательно' }, { status: 400 });
     }
 
+    const isAdmin = isAdminRole(auth.agent);
+    const agentId = isAdmin && body.agentId ? String(body.agentId) : auth.agent.id;
+    const assignedAgentName =
+      isAdmin && body.assignedAgentName ? body.assignedAgentName : auth.agent.name;
+
     const id = body.id || `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const newTask: CRMTask = {
+      id,
+      title: String(body.title),
+      description: body.description ?? undefined,
+      deadline: body.deadline || new Date().toISOString().split('T')[0],
+      status: (body.status || 'pending') as CRMTask['status'],
+      priority: (body.priority || 'medium') as CRMTask['priority'],
+      clientId: body.clientId ?? undefined,
+      clientName: body.clientName ?? undefined,
+      clientPhone: body.clientPhone ?? undefined,
+      clientAddress: body.clientAddress ?? undefined,
+      agentId,
+      assignedAgentName,
+      actionType: body.actionType ?? undefined,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+
+    if (isDbMockMode()) {
+      getMockStore().tasks.unshift(newTask);
+      return NextResponse.json(newTask, { status: 201 });
+    }
 
     await execute(
       `INSERT INTO crm_tasks (
@@ -32,25 +69,25 @@ export async function POST(request: NextRequest) {
         actionType, createdAt
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id,
-        body.title,
-        body.description ?? null,
-        body.deadline || new Date().toISOString().split('T')[0],
-        body.status || 'pending',
-        body.priority || 'medium',
-        body.clientId ?? null,
-        body.clientName ?? null,
-        body.clientPhone ?? null,
-        body.clientAddress ?? null,
-        body.agentId,
-        body.assignedAgentName ?? null,
-        body.actionType ?? null,
-        new Date().toISOString().split('T')[0],
+        newTask.id,
+        newTask.title,
+        newTask.description ?? null,
+        newTask.deadline,
+        newTask.status,
+        newTask.priority,
+        newTask.clientId ?? null,
+        newTask.clientName ?? null,
+        newTask.clientPhone ?? null,
+        newTask.clientAddress ?? null,
+        newTask.agentId,
+        newTask.assignedAgentName ?? null,
+        newTask.actionType ?? null,
+        newTask.createdAt,
       ]
     );
 
     const created = await queryOne('SELECT * FROM crm_tasks WHERE id = ? LIMIT 1', [id]);
-    return NextResponse.json(created, { status: 201 });
+    return NextResponse.json(created || newTask, { status: 201 });
   } catch (error: any) {
     console.error('[POST /api/tasks]', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -94,7 +94,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
       slug: 'prodazha-kvartiry',
       desc: 'Вторичный фонд, улучшенные планировки, сталинки в центре и новые ЖК (Минск-Мир, Новая Боровая, Левада, D3). От хоум-стейджинга до получения расчетных документов в БТИ.',
       photo: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=800',
-      badge: 'Срок сделки от 14 дней',
+      badge: 'Средний срок — 26 дней',
       features: ['Глубокая проверка истории приватизации', 'Профессиональный фотосет без искажений', 'Альтернативные цепочки любой длины']
     },
     {
@@ -127,7 +127,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
     {
       num: '01',
       title: 'Глубокий рыночный аудит и оценка по реальным сделкам',
-      desc: 'Мы не опираемся на завышенные «хотелки» из частных объявлений. С 2022 года наши эксперты анализируют закрытую базу фактических сделок Национального кадастрового агентства (НКА) за последние 90 дней, определяя реальную максимальную цену продажи.'
+      desc: 'Мы не опираемся на завышенные «хотелки» из частных объявлений. С 2022 года наши эксперты анализируют реестр фактических сделок Национального кадастрового агентства (НКА) за последние 90 дней, определяя реальную максимальную цену продажи.'
     },
     {
       num: '02',
@@ -141,8 +141,8 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
     },
     {
       num: '04',
-      title: 'Масштабный маркетинг на 14 ведущих площадках',
-      desc: 'Объект размещается на Realt.by, Onliner, Kufar с платным премиум-продвижением. Подключаются таргетированные кампании и закрытая рассылка по внутренней базе из 1 200+ покупателей.'
+      title: 'Масштабный маркетинг на ведущих площадках',
+      desc: 'Объект размещается на Realt.by, Onliner, Kufar с платным премиум-продвижением. Подключаются таргетированные кампании и адресное предложение заинтересованным покупателям, уже оставившим заявки на подбор.'
     },
     {
       num: '05',
@@ -174,7 +174,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
   const faqItems = [
     {
       q: 'Сколько лет АН «Фаттория» работает на рынке недвижимости Беларуси?',
-      a: 'Агентство недвижимости «Фаттория» успешно осуществляет профессиональную риэлтерскую деятельность с 2022 года. За более чем 4 года работы мы провели сотни сделок любой сложности: от типовых однокомнатных квартир до элитных усадеб, долей и крупных коммерческих объектов. Наша деятельность полностью застрахована, а риэлтеры имеют государственные аттестаты Министерства юстиции РБ.'
+      a: 'Агентство недвижимости «Фаттория» успешно осуществляет профессиональную риэлтерскую деятельность с 2022 года. 1424+ клиентов выбрали нас для своих сделок любой сложности: от типовых однокомнатных квартир до загородных домов, долей и коммерческих объектов. Наша деятельность полностью застрахована, а риэлтеры имеют государственные аттестаты Министерства юстиции РБ.'
     },
     {
       q: 'Каков официальный размер комиссии агентства при продаже?',
@@ -246,7 +246,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
               className="text-[17px] lg:text-[21px] font-light leading-relaxed max-w-3xl mb-8 text-white/90"
               style={{ textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}
             >
-              С 2022 года обеспечиваем безопасные сделки купли-продажи квартир, загородных домов, долей и коммерческих площадей. Государственный регламент комиссии от 1.5% до 6%, закрытая база из 1 200+ покупателей и средний срок экспозиции 21 день.
+              С 2022 года обеспечиваем безопасные сделки купли-продажи квартир, загородных домов, долей и коммерческих площадей. 1424+ клиентов выбрали нас для своих сделок. Средний срок — 26 дней, минимальный — 2 дня. Государственный регламент комиссии от 1.5% до 6%.
             </p>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
@@ -256,7 +256,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium"><Scale className="w-3.5 h-3.5 text-sky-400" /> Тарифы Минюста 1.5%–6%</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
-              <span className="inline-flex items-center gap-2 font-medium"><Clock className="w-3.5 h-3.5 text-amber-300" /> Срок сделки от 14 дней</span>
+              <span className="inline-flex items-center gap-2 font-medium"><Clock className="w-3.5 h-3.5 text-amber-300" /> Средний срок — 26 дней (мин. 2 дня)</span>
             </div>
           </div>
         </div>
@@ -323,7 +323,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
                 <Award className="w-4 h-4" /> Надежность АН «Фаттория»
               </div>
               <p className="text-xs leading-relaxed text-stone-600">
-                Работаем с 2022 года. За это время 98.4% выставленных нами объектов проданы по стартовой цене или выше.
+                1424+ клиентов выбрали нас для своих сделок с 2022 года. Средний срок — 26 дней, минимальный — 2 дня.
               </p>
             </div>
           </aside>
@@ -440,18 +440,18 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
                 </div>
                 <div className="p-5 bg-stone-50 rounded-2xl border border-stone-200 text-center">
                   <div className="text-3xl font-light text-stone-900 mb-1" style={{ fontFamily: displayFont }}>
-                    1 200+
+                    1424+
                   </div>
                   <div className="text-[11px] uppercase tracking-wider text-stone-500 font-medium">
-                    Покупателей в CRM
+                    Клиентов выбрали нас
                   </div>
                 </div>
                 <div className="p-5 bg-stone-50 rounded-2xl border border-stone-200 text-center">
                   <div className="text-3xl font-light text-stone-900 mb-1" style={{ fontFamily: displayFont }}>
-                    21 день
+                    26 дней
                   </div>
                   <div className="text-[11px] uppercase tracking-wider text-stone-500 font-medium">
-                    Средний срок выхода
+                    Средний срок (мин. 2 дня)
                   </div>
                 </div>
                 <div className="p-5 bg-stone-50 rounded-2xl border border-stone-200 text-center">

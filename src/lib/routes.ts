@@ -19,7 +19,7 @@ export const PAGE_ROUTES: Record<PageId, RouteInfo> = {
     pageId: 'catalog',
     canonicalPath: '/catalog',
     title: 'Каталог недвижимости в Минске и Минской области | АН Фаттория',
-    description: 'Актуальная база квартир, домов, участков и коммерческой недвижимости в Минске. Подбор объектов, реальные цены и фото.'
+    description: 'Актуальный каталог квартир, домов, участков и коммерческой недвижимости в Минске. Подбор объектов, реальные цены и фото.'
   },
   'nasha-komanda': {
     pageId: 'nasha-komanda',
@@ -72,8 +72,8 @@ export const PAGE_ROUTES: Record<PageId, RouteInfo> = {
   'baza-pokupatelej': {
     pageId: 'baza-pokupatelej',
     canonicalPath: '/baza-pokupatelej',
-    title: 'База реальных покупателей недвижимости | АН Фаттория',
-    description: 'Актуальная база покупателей с одобренными кредитами и наличными средствами для быстрой продажи вашей недвижимости.'
+    title: 'Запросы покупателей недвижимости | АН Фаттория',
+    description: 'Актуальные запросы покупателей с одобренными кредитами и наличными средствами для быстрой продажи вашей недвижимости.'
   },
   'agent-cabinet': {
     pageId: 'agent-cabinet',

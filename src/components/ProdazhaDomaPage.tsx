@@ -254,7 +254,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
                 <Award className="w-4 h-4" /> Минский район с 2022 года
               </div>
               <p className="text-xs leading-relaxed text-stone-600">
-                Более 180 проверенных загородных объектов. Отсутствие скрытых сервитутов и гарантия кадастровых границ.
+                1424+ клиентов выбрали нас для своих сделок с 2022 года. Проверка земли, отсутствие скрытых сервитутов и гарантия кадастровых границ.
               </p>
             </div>
           </aside>

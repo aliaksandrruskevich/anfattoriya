@@ -86,7 +86,7 @@ export default function RieltorPage({ activePage, navigateTo, handleAddLead }: P
           <p className="text-stone-400 text-center text-sm mb-16">Полный цикл сопровождения сделки — от оценки до регистрации</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
             {[
-              { step: '01', title: 'Оценка и консультация', desc: 'Бесплатный выезд на объект. Определение рыночной стоимости на основе закрытой базы БРТИ. Рекомендации по предпродажной подготовке.' },
+              { step: '01', title: 'Оценка и консультация', desc: 'Бесплатный выезд на объект. Определение рыночной стоимости на основе реестра сделок БРТИ и НКА. Рекомендации по предпродажной подготовке.' },
               { step: '02', title: 'Маркетинг и показы', desc: 'Профессиональная фотосъёмка, 3D-тур, размещение на 14 площадках. Организация показов и переговоры с покупателями.' },
               { step: '03', title: 'Сделка и регистрация', desc: 'Юридическая проверка, составление договора, организация расчётов, регистрация права собственности. Вы получаете деньги или ключи.' },
             ].map((item, i) => (
@@ -137,7 +137,7 @@ export default function RieltorPage({ activePage, navigateTo, handleAddLead }: P
             </div>
             <div className="lg:col-span-3 flex flex-col gap-10">
               <div className="flex flex-col gap-2"><h3 className="text-[16px] font-bold text-[#1a1a1a]">Гарантия качества</h3><div className="w-full h-px border-b border-dashed border-[#1a1a1a]/30 mb-1"></div><p className="text-[14px] font-normal text-[#444] leading-relaxed">Служба контроля качества.</p></div>
-              <div className="flex flex-col gap-2"><h3 className="text-[16px] font-bold text-[#1a1a1a]">База предложений</h3><div className="w-full h-px border-b border-dashed border-[#1a1a1a]/30 mb-1"></div><p className="text-[14px] font-normal text-[#444] leading-relaxed">Актуальная база проверенных объектов.</p></div>
+              <div className="flex flex-col gap-2"><h3 className="text-[16px] font-bold text-[#1a1a1a]">Каталог предложений</h3><div className="w-full h-px border-b border-dashed border-[#1a1a1a]/30 mb-1"></div><p className="text-[14px] font-normal text-[#444] leading-relaxed">Проверенные объекты в каталоге агентства.</p></div>
               <div className="flex flex-col gap-2"><h3 className="text-[16px] font-bold text-[#1a1a1a]">Стоимость</h3><div className="w-full h-px border-b border-dashed border-[#1a1a1a]/30 mb-1"></div><p className="text-[14px] font-normal text-[#444] leading-relaxed">Государственные тарифы</p></div>
             </div>
           </div>

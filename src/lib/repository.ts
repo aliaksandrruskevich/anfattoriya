@@ -1,4 +1,6 @@
-import { query, queryOne } from './db';
+import { isDbMockMode, query, queryOne } from './db';
+import { getMockStore } from './mockStore';
+import { sanitizeAgentForClient } from './sanitize';
 import type { Agent, Property, Review, Article, Lead, Buyer, ColdSeller, CRMTask } from '../types';
 
 /**
@@ -35,13 +37,23 @@ function decodeHtmlEntities(text: string | null | undefined): string | undefined
     .replace(/&deg;/g, '°')
     .replace(/&plusmn;/g, '±')
     .replace(/[ \t]+/g, ' ');
-    // ⚠️ .trim() УБРАН — обрезал \n в начале/конце
-    // ⚠️ \s+ ЗАМЕНЁН на [ \t]+ — не трогает \n и \r
 }
 
 // ==================== AGENTS ====================
 
 export async function getAgents(): Promise<Agent[]> {
+  if (isDbMockMode()) {
+    const store = getMockStore();
+    return store.agents
+      .filter((a) => (a.status || 'active') === 'active' && !a.isDismissed)
+      .map((a) => ({
+        ...sanitizeAgentForClient(a),
+        objectsCount: store.properties.filter(
+          (p) => p.assignedAgentId === a.id && (p.status || 'active') === 'active'
+        ).length,
+      }));
+  }
+
   const rows = await query(
     `SELECT a.*,
        (SELECT COUNT(*) FROM properties p
@@ -54,6 +66,16 @@ export async function getAgents(): Promise<Agent[]> {
 }
 
 export async function getAllAgents(): Promise<Agent[]> {
+  if (isDbMockMode()) {
+    const store = getMockStore();
+    return store.agents.map((a) => ({
+      ...sanitizeAgentForClient(a),
+      objectsCount: store.properties.filter(
+        (p) => p.assignedAgentId === a.id && (p.status || 'active') === 'active'
+      ).length,
+    }));
+  }
+
   const rows = await query(
     `SELECT a.*,
        (SELECT COUNT(*) FROM properties p
@@ -65,6 +87,18 @@ export async function getAllAgents(): Promise<Agent[]> {
 }
 
 export async function getAgentById(id: string): Promise<Agent | null> {
+  if (isDbMockMode()) {
+    const store = getMockStore();
+    const found = store.agents.find((a) => a.id === id);
+    if (!found) return null;
+    return {
+      ...sanitizeAgentForClient(found),
+      objectsCount: store.properties.filter(
+        (p) => p.assignedAgentId === found.id && (p.status || 'active') === 'active'
+      ).length,
+    };
+  }
+
   const row = await queryOne(
     `SELECT a.*,
        (SELECT COUNT(*) FROM properties p
@@ -79,20 +113,49 @@ export async function getAgentById(id: string): Promise<Agent | null> {
 // ==================== ARTICLES ====================
 
 export async function getArticles(): Promise<Article[]> {
+  if (isDbMockMode()) {
+    return getMockStore().articles
+      .filter((a) => a.published !== false)
+      .map(({ published: _p, ...rest }) => rest);
+  }
+
   const rows = await query(
     `SELECT * FROM articles WHERE published = 1 ORDER BY date DESC`
   );
   return rows.map(rowToArticle);
 }
 
+export async function getAllArticles(): Promise<Article[]> {
+  if (isDbMockMode()) {
+    return getMockStore().articles.map(({ published: _p, ...rest }) => rest);
+  }
+  const rows = await query(`SELECT * FROM articles ORDER BY date DESC`);
+  return rows.map(rowToArticle);
+}
+
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
-  const row = await queryOne(`SELECT * FROM articles WHERE slug = ? LIMIT 1`, [slug]);
+  if (isDbMockMode()) {
+    const found = getMockStore().articles.find(
+      (a) => a.slug === slug || a.id === slug
+    );
+    if (!found) return null;
+    const { published: _p, ...rest } = found;
+    return rest;
+  }
+
+  const row = await queryOne(`SELECT * FROM articles WHERE slug = ? OR id = ? LIMIT 1`, [slug, slug]);
   return row ? rowToArticle(row) : null;
 }
 
 // ==================== REVIEWS ====================
 
 export async function getReviews(): Promise<Review[]> {
+  if (isDbMockMode()) {
+    return getMockStore().reviews
+      .filter((r) => r.published !== false)
+      .map(({ published: _p, ...rest }) => rest);
+  }
+
   const rows = await query(
     `SELECT * FROM reviews WHERE published = 1 ORDER BY createdAt DESC`
   );
@@ -115,6 +178,15 @@ export async function getProperties(filters?: {
   agentId?: string;
   limit?: number;
 }): Promise<Property[]> {
+  if (isDbMockMode()) {
+    let list = [...getMockStore().properties];
+    if (filters?.type) list = list.filter((p) => p.type === filters.type);
+    if (filters?.status) list = list.filter((p) => (p.status || 'active') === filters.status);
+    if (filters?.agentId) list = list.filter((p) => p.assignedAgentId === filters.agentId);
+    if (filters?.limit) list = list.slice(0, Number(filters.limit));
+    return list;
+  }
+
   const where: string[] = [];
   const params: any[] = [];
 
@@ -142,6 +214,14 @@ export async function getProperties(filters?: {
 }
 
 export async function getPropertyBySlug(slug: string): Promise<Property | null> {
+  if (isDbMockMode()) {
+    return (
+      getMockStore().properties.find(
+        (p) => p.slug === slug || p.id === slug
+      ) || null
+    );
+  }
+
   const row = await queryOne(
     `SELECT * FROM properties WHERE slug = ? OR externalId = ? OR id = ? LIMIT 1`,
     [slug, slug, slug]
@@ -150,8 +230,14 @@ export async function getPropertyBySlug(slug: string): Promise<Property | null> 
 }
 
 export async function getAllPropertySlugs(): Promise<string[]> {
+  if (isDbMockMode()) {
+    return getMockStore().properties
+      .filter((p) => (p.status || 'active') === 'active' && p.isPublished !== false && !p.isClosedBase && p.slug)
+      .map((p) => p.slug as string);
+  }
+
   const rows = await query(
-    `SELECT slug FROM properties WHERE status = 'active' AND slug IS NOT NULL`
+    `SELECT slug FROM properties WHERE status = 'active' AND isPublished = 1 AND (isClosedBase = 0 OR isClosedBase IS NULL) AND slug IS NOT NULL`
   );
   return rows.map((r) => r.slug).filter((s): s is string => Boolean(s));
 }
@@ -159,6 +245,13 @@ export async function getAllPropertySlugs(): Promise<string[]> {
 // ==================== LEADS ====================
 
 export async function getLeads(filters?: { stage?: string; agentId?: string }): Promise<Lead[]> {
+  if (isDbMockMode()) {
+    let list = [...getMockStore().leads];
+    if (filters?.stage) list = list.filter((l) => l.stage === filters.stage);
+    if (filters?.agentId) list = list.filter((l) => l.assignedAgentId === filters.agentId);
+    return list;
+  }
+
   const where: string[] = [];
   const params: any[] = [];
 
@@ -183,6 +276,13 @@ export async function getLeads(filters?: { stage?: string; agentId?: string }): 
 // ==================== BUYERS ====================
 
 export async function getBuyers(filters?: { agentId?: string; status?: string }): Promise<Buyer[]> {
+  if (isDbMockMode()) {
+    let list = [...getMockStore().buyers];
+    if (filters?.agentId) list = list.filter((b) => b.assignedAgentId === filters.agentId);
+    if (filters?.status) list = list.filter((b) => b.status === filters.status);
+    return list;
+  }
+
   const where: string[] = [];
   const params: any[] = [];
 
@@ -207,6 +307,13 @@ export async function getBuyers(filters?: { agentId?: string; status?: string })
 // ==================== SELLERS ====================
 
 export async function getSellers(filters?: { agentId?: string; stage?: string }): Promise<ColdSeller[]> {
+  if (isDbMockMode()) {
+    let list = [...getMockStore().sellers];
+    if (filters?.agentId) list = list.filter((s) => s.assignedAgentId === filters.agentId);
+    if (filters?.stage) list = list.filter((s) => s.kanbanStage === filters.stage);
+    return list;
+  }
+
   const where: string[] = [];
   const params: any[] = [];
 
@@ -231,6 +338,12 @@ export async function getSellers(filters?: { agentId?: string; stage?: string })
 // ==================== TASKS ====================
 
 export async function getTasks(agentId?: string): Promise<CRMTask[]> {
+  if (isDbMockMode()) {
+    let list = [...getMockStore().tasks];
+    if (agentId) list = list.filter((t) => t.agentId === agentId);
+    return list.sort((a, b) => (a.deadline || '').localeCompare(b.deadline || ''));
+  }
+
   const whereSql = agentId ? 'WHERE agentId = ?' : '';
   const params = agentId ? [agentId] : [];
 

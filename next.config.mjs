@@ -1,6 +1,7 @@
 import 'dotenv/config';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
 
   // Проверка типов на билде. Раскомментируйте ignoreBuildErrors только если нужно срочно.

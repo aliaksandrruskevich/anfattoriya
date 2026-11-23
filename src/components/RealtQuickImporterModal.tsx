@@ -216,7 +216,7 @@ export default function RealtQuickImporterModal({ isOpen, onClose, onImport, log
                     className="flex-1 bg-purple-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm shadow-xl shadow-purple-200 hover:bg-purple-700 transition-all flex items-center justify-center gap-3"
                   >
                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                    Сохранить в мою базу (Закрытая)
+                    Сохранить в черновики CRM
                   </button>
                   <button
                     onClick={() => { setParsedData(null); setUrl(''); }}

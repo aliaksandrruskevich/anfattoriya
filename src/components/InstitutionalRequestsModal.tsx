@@ -11,6 +11,7 @@ import { Agent, Property, InstitutionalRequest, InstitutionKey } from '../types'
 import { INSTITUTIONS_LIST, AGENCY_OFFICIAL_DETAILS, DEFAULT_REALTORS_POOL, InstitutionConfig } from '../data/institutions';
 import { declineFullName, declinePropertyType } from '../utils/declension';
 import { exportHtmlToWord } from '../utils/wordExport';
+import { sanitizeRichHtml } from '../lib/sanitize';
 
 interface InstitutionalRequestsModalProps {
   isOpen: boolean;
@@ -1786,7 +1787,7 @@ export const InstitutionalRequestsModal: React.FC<InstitutionalRequestsModalProp
                   {/* DOCUMENT BODY */}
                   <div 
                     className="doc-body text-[12.5px] text-justify leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: generatedDoc.bodyHtml }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(generatedDoc.bodyHtml) }}
                   />
                 </div>
 

@@ -19,23 +19,26 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
   onClose,
   isOpen = true,
 }) => {
-  if (!isOpen) return null;
-
-  const DEFAULT_TOKEN = '';
   const DEFAULT_CHAT_ID = '';
   const DEFAULT_BOT_USER = '@anfattoria_bot';
 
-  const [botToken, setBotToken] = useState<string>(() => {
-    if (typeof window === 'undefined') return DEFAULT_TOKEN;
-    return localStorage.getItem('fp_tg_bot_token') || DEFAULT_TOKEN;
-  });
+  const [tokenConfigured, setTokenConfigured] = useState<boolean>(false);
+  const [chatIdMasked, setChatIdMasked] = useState<string>('');
   const [chatId, setChatId] = useState<string>(() => {
     if (typeof window === 'undefined') return DEFAULT_CHAT_ID;
-    return localStorage.getItem('fp_tg_chat_id') || DEFAULT_CHAT_ID;
+    try {
+      return localStorage.getItem('fp_tg_chat_id') || DEFAULT_CHAT_ID;
+    } catch {
+      return DEFAULT_CHAT_ID;
+    }
   });
   const [botUsername, setBotUsername] = useState<string>(() => {
     if (typeof window === 'undefined') return DEFAULT_BOT_USER;
-    return localStorage.getItem('fp_tg_bot_user') || DEFAULT_BOT_USER;
+    try {
+      return localStorage.getItem('fp_tg_bot_user') || DEFAULT_BOT_USER;
+    } catch {
+      return DEFAULT_BOT_USER;
+    }
   });
   const [autoNotifyNewLeads, setAutoNotifyNewLeads] = useState<boolean>(true);
   const [testStatus, setTestStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
@@ -55,46 +58,51 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Load current configuration from server
+  // Load current safe configuration status from server
   useEffect(() => {
+    if (!isOpen) return;
+    try {
+      localStorage.removeItem('fp_tg_bot_token');
+    } catch {}
+
     fetch('/api/telegram-config')
-      .then(res => res.json())
-      .then(data => {
-        if (data?.botToken && (!botToken || botToken === '')) {
-          setBotToken(data.botToken);
-        }
-        if (data?.chatId && (!chatId || chatId === '')) {
-          setChatId(data.chatId);
-        }
-        if (data?.botUsername) {
-          setBotUsername(data.botUsername);
-        }
-        if (data?.enabled !== undefined) {
-          setAutoNotifyNewLeads(data.enabled);
-        }
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json();
       })
-      .catch(err => console.warn('Could not fetch server tg config:', err));
-  }, []);
+      .then((data) => {
+        if (!data) return;
+        setTokenConfigured(Boolean(data.tokenConfigured));
+        if (data.chatIdMasked) setChatIdMasked(String(data.chatIdMasked));
+        if (data.botUsername) setBotUsername(String(data.botUsername));
+        if (data.enabled !== undefined) setAutoNotifyNewLeads(Boolean(data.enabled));
+      })
+      .catch((err) => console.warn('Could not fetch server tg config:', err));
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const saveSettings = async () => {
-    localStorage.setItem('fp_tg_bot_token', botToken);
-    localStorage.setItem('fp_tg_chat_id', chatId);
-    localStorage.setItem('fp_tg_bot_user', botUsername);
+    try {
+      localStorage.setItem('fp_tg_chat_id', chatId);
+      localStorage.setItem('fp_tg_bot_user', botUsername);
+    } catch {}
 
     try {
       const res = await fetch('/api/telegram-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          botToken: botToken.trim(),
           chatId: chatId.trim(),
           botUsername: botUsername.trim(),
-          enabled: autoNotifyNewLeads
-        })
+          enabled: autoNotifyNewLeads,
+        }),
       });
       const data = await res.json();
       if (data?.success) {
         setStatusMessage('Настройки Telegram успешно сохранены на сервере!');
+      } else {
+        setStatusMessage(`Ошибка: ${data?.error || 'Недостаточно прав или ошибка сервера'}`);
       }
     } catch (e) {
       console.warn('Config save error:', e);
@@ -111,9 +119,8 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          botToken: botToken.trim(),
-          chatId: chatId.trim()
-        })
+          chatId: chatId.trim() || undefined,
+        }),
       });
       const data = await res.json();
 
@@ -122,7 +129,7 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
         setStatusMessage('✅ Тестовое уведомление успешно отправлено в Telegram!');
       } else {
         setTestStatus('error');
-        setStatusMessage(`Ошибка: ${data?.error || 'Проверьте токен бота и Chat ID'}`);
+        setStatusMessage(`Ошибка: ${data?.error || 'Проверьте TELEGRAM_BOT_TOKEN в .env и Chat ID'}`);
       }
     } catch (err: any) {
       console.error(err);
@@ -204,15 +211,11 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-bold text-neutral-400 mb-1">
-                  Telegram Bot Token:
+                  Токен бота (серверный .env):
                 </label>
-                <input
-                  type="password"
-                  value={botToken}
-                  onChange={(e) => setBotToken(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-800 text-white rounded-xl px-3 py-2 text-xs font-mono focus:border-sky-500 outline-none"
-                  placeholder="Токен от @BotFather (напр. 7123456789:AAF...)"
-                />
+                <div className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-between ${tokenConfigured ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+                  <span>{tokenConfigured ? 'Настроен в TELEGRAM_BOT_TOKEN' : 'Не задан в окружении сервера'}</span>
+                </div>
               </div>
 
               <div>
@@ -224,7 +227,7 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
                   value={chatId}
                   onChange={(e) => setChatId(e.target.value)}
                   className="w-full bg-neutral-900 border border-neutral-800 text-white rounded-xl px-3 py-2 text-xs font-mono focus:border-sky-500 outline-none"
-                  placeholder="-100123456789 или @channel_name"
+                  placeholder={chatIdMasked ? `Текущий: ${chatIdMasked}` : '-100123456789 или @channel_name'}
                 />
               </div>
             </div>
@@ -373,7 +376,7 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
             <div className="bg-neutral-950 p-3.5 rounded-xl border border-neutral-800 text-center space-y-1">
               <div className="text-[10px] text-neutral-400 uppercase font-black">Статус интеграции</div>
               <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                {botToken && chatId ? '🟢 Подключен' : '🟡 Готов к настройке'}
+                {tokenConfigured && (chatId || chatIdMasked) ? '🟢 Подключен' : '🟡 Готов к настройке'}
               </div>
             </div>
           </div>

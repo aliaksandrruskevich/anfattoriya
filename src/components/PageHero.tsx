@@ -56,14 +56,14 @@ const PAGE_HERO_CONFIG: Record<string, {
   },
   'prodazha-kvartiry': {
     title: 'Продайте квартиру дороже рынка на 8–15%',
-    description: 'Профессиональная оценка, фотосъёмка, 3D-тур Matterport, реклама на 14 площадках — средний срок продажи 14 дней.',
+    description: 'Профессиональная оценка, фотосъёмка, 3D-тур, реклама на ведущих площадках — средний срок продажи 26 дней, минимальный — 2 дня.',
     bgImage: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&q=80&w=2070',
     formPlaceholder: 'Например: 2-комнатная, Первомайский район',
     formSource: 'Продажа квартиры: Hero-блок'
   },
   'prodazha-pomescheniya': {
     title: 'Продайте офис, склад или торговое помещение по максимальной цене',
-    description: 'Оценка по доходному методу, инвестиционный меморандум, доступ к базе из 500+ инвесторов.',
+    description: 'Оценка по доходному методу, инвестиционный меморандум, индивидуальный подбор целевых покупателей и инвесторов.',
     bgImage: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=2070',
     formPlaceholder: 'Например: Офис, магазин, склад',
     formSource: 'Продажа помещения: Hero-блок'
@@ -167,8 +167,8 @@ const PAGE_HERO_CONFIG: Record<string, {
     formSource: '3D: Hero-блок'
   },
   'baza-pokupatelej': {
-    title: 'Закрытая база покупателей',
-    description: 'Прямой доступ к активным инвесторам и покупателям с одобренными кредитами.',
+    title: 'Актуальные запросы покупателей',
+    description: 'Подбор активных покупателей и инвесторов под ваш объект недвижимости.',
     bgImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=1600',
     formPlaceholder: 'Например: Склад 500 м2, 3-к квартира',
     formSource: 'База покупателей: Hero-блок'
@@ -189,7 +189,7 @@ const PAGE_HERO_CONFIG: Record<string, {
   },
   'otzyvy-klientov': {
     title: 'Реальные отзывы наших клиентов',
-    description: 'Сотни успешных историй продажи квартир, домов и коммерческих площадей.',
+    description: '1424+ клиентов выбрали нас для своих сделок с квартирами, домами и коммерческой недвижимостью.',
     bgImage: 'https://images.unsplash.com/photo-1552581230-2645f27d5b46?auto=format&fit=crop&q=80&w=1600',
     formPlaceholder: 'Хочу поблагодарить / Оставить отзыв',
     formSource: 'Отзывы: Hero-блок'

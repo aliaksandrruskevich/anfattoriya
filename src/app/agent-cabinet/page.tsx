@@ -8,9 +8,11 @@ import { useRouter } from 'next/navigation';
 export default function Page() {
   const {
     agents, properties, articles, addLead,
-    loggedInAgent, setLoggedInAgent, isSyncing,
+    loggedInAgent, setLoggedInAgent, logout, isSyncing,
     leads, saveLeadsToStore, handleClearLeads,
     buyers, setBuyersList,
+    sellers, setSellersList,
+    tasks, setTasksList,
     setAgentsList, setPropertiesList, setArticlesList,
     syncWithRealt, loadCabinetData,
   } = useApp();
@@ -21,6 +23,7 @@ export default function Page() {
     <AgentCabinetPage
       loggedInAgent={loggedInAgent}
       setLoggedInAgent={setLoggedInAgent}
+      onLogout={logout}
       agentsList={agents}
       setAgentsList={setAgentsList}
       propertiesList={properties}
@@ -31,6 +34,10 @@ export default function Page() {
       handleClearLeads={handleClearLeads}
       buyersList={buyers}
       setBuyersList={setBuyersList}
+      sellersList={sellers}
+      setSellersList={setSellersList}
+      tasksList={tasks}
+      setTasksList={setTasksList}
       articlesList={articles}
       setArticlesList={setArticlesList}
       syncWithRealt={syncWithRealt}

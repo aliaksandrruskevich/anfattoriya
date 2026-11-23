@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import DynamicPage from './DynamicPageClient';
 import { getArticleBySlug } from '@/lib/repository';
+import { PAGE_ROUTES, PATH_ALIASES } from '@/lib/routes';
+import type { PageId } from '@/types';
 
 const BASE_URL = 'https://fattoria.by';
 
@@ -19,12 +21,12 @@ const PAGES_META: Record<string, PageMeta> = {
   'catalog': {
     title: 'Каталог недвижимости в Минске',
     description:
-      'Актуальные объекты недвижимости в Минске: квартиры, дома, участки, коммерческая недвижимость. Более 500 проверенных объектов от АН Фаттория.',
+      'Актуальные объекты недвижимости в Минске: квартиры, дома, участки, коммерческая недвижимость с юридической проверкой от АН Фаттория.',
   },
   'ob-agentstve': {
     title: 'О компании ',
     description:
-      'АН Фаттория — агентство недвижимости в Минске с 2022 года. Лицензия Минюста РБ № 02240/446, страхование ответственности, 1000+ сделок в год.',
+      'АН Фаттория — агентство недвижимости в Минске с 2022 года. Лицензия Минюста РБ № 02240/446, 1424+ клиентов выбрали нас для своих сделок. Средний срок — 26 дней, минимальный — 2 дня.',
   },
   'nasha-komanda': {
     title: 'Наша команда риелторов',
@@ -90,8 +92,8 @@ const PAGES_META: Record<string, PageMeta> = {
     description: 'Обмен квартир, домов и коммерческой недвижимости в Минске с доплатой и без. Помощь в подборе вариантов.',
   },
   'baza-pokupatelej': {
-    title: 'База покупателей недвижимости',
-    description: 'Актуальная база покупателей недвижимости в Минске. Быстрая продажа объекта.',
+    title: 'Запросы покупателей недвижимости',
+    description: 'Актуальные запросы покупателей недвижимости в Минске. Быстрая продажа объекта.',
   },
   'rieltor': {
     title: 'Риелторы',
@@ -143,7 +145,7 @@ const PAGES_META: Record<string, PageMeta> = {
   },
   'effektivnye-instrumenty': {
     title: 'Эффективные инструменты продажи',
-    description: 'Инструменты эффективной продажи недвижимости в Минске: реклама, базы, аналитика.',
+    description: 'Инструменты эффективной продажи недвижимости в Минске: реклама, аналитика и юридическое сопровождение.',
   },
   'kontrol-kachestva': {
     title: 'Контроль качества услуг',
@@ -176,6 +178,21 @@ function normalizeSlug(rawSlug: string | string[] | undefined): string {
   return String(rawSlug);
 }
 
+function resolveKnownMeta(key: string): PageMeta | undefined {
+  if (PAGES_META[key]) return PAGES_META[key];
+  const aliasId = PATH_ALIASES[`/${key}`] || (PAGE_ROUTES[key as PageId] ? (key as PageId) : undefined);
+  if (aliasId && aliasId !== 'not-found') {
+    if (PAGES_META[aliasId]) return PAGES_META[aliasId];
+    if (PAGE_ROUTES[aliasId]) {
+      return {
+        title: PAGE_ROUTES[aliasId].title,
+        description: PAGE_ROUTES[aliasId].description,
+      };
+    }
+  }
+  return undefined;
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -188,9 +205,9 @@ export async function generateMetadata({
   const url = `${BASE_URL}${path}`;
   const key = slug.split('/')[0] || '';
 
-  let meta: PageMeta | undefined = PAGES_META[key];
+  let meta: PageMeta | undefined = resolveKnownMeta(key);
 
-  // Если это статья (slug не из PAGES_META) — берём из БД
+  // Если это статья (slug не из PAGES_META / алиасов) — берём из БД
   if (!meta) {
     try {
       const article = await getArticleBySlug(slug);
@@ -236,7 +253,7 @@ export default async function Page({
   const slug = normalizeSlug(rawSlug);
   const key = slug.split('/')[0] || '';
 
-  const isKnownPage = Boolean(PAGES_META[key]);
+  const isKnownPage = Boolean(resolveKnownMeta(key));
 
   // SSR: получаем статью на сервере (только если это НЕ известная страница)
   let initialArticle = null;

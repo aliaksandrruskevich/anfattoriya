@@ -110,7 +110,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
   const faqItems = [
     {
       q: 'Как быстро АН «Фаттория» находит покупателя на коммерческий объект?',
-      a: 'Средний срок закрытия сделки в коммерческом сегменте составляет от 20 до 45 дней. Благодаря собственной закрытой базе частных и корпоративных инвесторов, сформированной с 2022 года, предложения о продаже качественного готового бизнеса мы первично отправляем прямым покупателям без публичного демпинга.'
+      a: 'Средний срок сделки в нашем агентстве — 26 дней, минимальный — 2 дня. Благодаря системной работе с частными и корпоративными инвесторами с 2022 года, предложения о продаже качественного готового бизнеса мы первично презентуем целевым покупателям без публичного демпинга.'
     },
     {
       q: 'Как вы защищаете конфиденциальность продажи готового бизнеса?',
@@ -162,7 +162,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
               className="text-[17px] lg:text-[21px] font-light leading-relaxed max-w-3xl mb-8 text-white/90"
               style={{ textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}
             >
-              Офисы, street retail, торговые площади, склады и готовый арендный бизнес с подтвержденной доходностью. С 2022 года АН «Фаттория» реализует коммерческие активы с расчетом финансовой модели и закрытой базой инвесторов.
+              Офисы, street retail, торговые площади, склады и готовый арендный бизнес с подтвержденной доходностью. С 2022 года АН «Фаттория» реализует коммерческие активы с расчетом финансовой модели и прямым поиском профильных инвесторов.
             </p>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
@@ -235,7 +235,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
                 <Award className="w-4 h-4" /> B2B экспертиза с 2022
               </div>
               <p className="text-xs leading-relaxed text-stone-600">
-                Более 65 000 кв.м реализованных коммерческих площадей. Юридическое структурирование договоров купли-продажи.
+                1424+ клиентов выбрали нас для своих сделок. Юридическое структурирование договоров купли-продажи и налоговый аудит.
               </p>
             </div>
           </aside>
@@ -328,7 +328,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
                 />
                 <div className="p-4 bg-stone-50 text-xs text-stone-500 flex items-center justify-between border-t border-stone-200">
                   <span>Офисный блок 280 кв.м в БЦ на проспекте Победителей, закрытая сделка АН «Фаттория»</span>
-                  <span className="font-semibold text-stone-700">Инвестор из закрытой базы</span>
+                  <span className="font-semibold text-stone-700">Целевой инвестор</span>
                 </div>
               </div>
             </section>
@@ -342,7 +342,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
                 className="text-stone-900 mb-6 font-normal tracking-tight"
                 style={{ fontFamily: displayFont, fontSize: 'clamp(28px, 3.5vw, 40px)', lineHeight: 1.18 }}
               >
-                Закрытая база покупателей коммерческой недвижимости
+                Целевые покупатели коммерческой недвижимости
               </h2>
               <div className="prose text-stone-600 text-[16px] leading-relaxed font-light space-y-4">
                 <p>

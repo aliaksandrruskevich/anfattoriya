@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { syncRealtToDb } from '@/lib/data-service';
+import { requireAdminSession } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
-// POST /api/realt/sync — запустить синк вручную
+// POST /api/realt/sync — запустить синк вручную (только админ)
 export async function POST() {
+  const auth = await requireAdminSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const result = await syncRealtToDb();
     revalidatePath('/api/realt/properties');
@@ -14,8 +18,10 @@ export async function POST() {
   }
 }
 
-// GET /api/realt/sync — для проверки в браузере (не для прода)
 export async function GET() {
+  const auth = await requireAdminSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const result = await syncRealtToDb();
     revalidatePath('/api/realt/properties');

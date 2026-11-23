@@ -1,7 +1,10 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { execute, queryOne, query } from '@/lib/db';
-import { getArticles } from '@/lib/repository';
+import { execute, isDbMockMode, queryOne, query } from '@/lib/db';
+import { getAllArticles, getArticles } from '@/lib/repository';
+import { requireCrmSession } from '@/lib/auth';
+import { getMockStore } from '@/lib/mockStore';
 import { generateSlug } from '@/lib/slugify';
+import { sanitizeRichHtml } from '@/lib/sanitize';
 
 // GET /api/articles?all=true — список статей
 export async function GET(request: NextRequest) {
@@ -10,7 +13,11 @@ export async function GET(request: NextRequest) {
     const all = searchParams.get('all') === 'true';
 
     if (all) {
-      // Все статьи (включая черновики) — для CRM
+      const auth = await requireCrmSession();
+      if (auth.errorResponse) return auth.errorResponse;
+      if (isDbMockMode()) {
+        return NextResponse.json(await getAllArticles());
+      }
       const rows = await query('SELECT * FROM articles ORDER BY date DESC');
       return NextResponse.json(rows);
     }
@@ -23,8 +30,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/articles — создать статью
+// POST /api/articles — создать статью (только CRM)
 export async function POST(request: NextRequest) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json();
 
@@ -36,12 +46,29 @@ export async function POST(request: NextRequest) {
     }
 
     const id = body.id || `art-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const slug = body.slug ? generateSlug(body.slug) : generateSlug(body.title);
+    const cleanContent = sanitizeRichHtml(String(body.content));
 
-    // Slug: если передан — тоже прогоняем через generateSlug (кириллица → латиница),
-    // если нет — генерируем из заголовка.
-    const slug = body.slug
-      ? generateSlug(body.slug)
-      : generateSlug(body.title);
+    if (isDbMockMode()) {
+      const store = getMockStore();
+      if (store.articles.some((a) => a.slug === slug)) {
+        return NextResponse.json({ error: 'Статья с таким slug уже существует' }, { status: 409 });
+      }
+      const created = {
+        id,
+        slug,
+        title: String(body.title),
+        snippet: String(body.snippet || ''),
+        content: cleanContent,
+        category: body.category || 'news',
+        date: body.date || new Date().toLocaleDateString('ru-RU'),
+        photo: body.photo ?? '/photo/hero-news.jpg',
+        image: body.image ?? undefined,
+        published: body.published !== false,
+      };
+      store.articles.unshift(created);
+      return NextResponse.json(created, { status: 201 });
+    }
 
     await execute(
       `INSERT INTO articles (
@@ -53,7 +80,7 @@ export async function POST(request: NextRequest) {
         slug,
         body.title,
         body.snippet || '',
-        body.content,
+        cleanContent,
         body.category || 'news',
         body.date || new Date().toLocaleDateString('ru-RU'),
         body.photo ?? null,

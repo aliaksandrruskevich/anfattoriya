@@ -48,7 +48,7 @@ export default function MyDraftPropertiesTab({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-stone-900 uppercase tracking-tight flex items-center gap-3">
-            📦 Мои объекты <span className="text-stone-400 font-medium">/ Закрытая база</span>
+            📦 Мои объекты <span className="text-stone-400 font-medium">/ Черновики CRM</span>
           </h2>
           <p className="text-sm font-medium text-stone-500 mt-1">Здесь хранятся ваши черновики, объекты в работе и те, что ещё не опубликованы на сайте.</p>
         </div>
@@ -136,7 +136,7 @@ export default function MyDraftPropertiesTab({
                     </span>
                   ) : (
                     <span className="px-2.5 py-1.5 bg-stone-900/80 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1.5 shadow-lg">
-                      <Lock className="w-3 h-3" /> Закрытая база
+                      <Lock className="w-3 h-3" /> Черновик CRM
                     </span>
                   )}
                   

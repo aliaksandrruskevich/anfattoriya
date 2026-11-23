@@ -48,20 +48,9 @@ const DOCUMENTS = [
 
 function Reveal({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 150);
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      setVisible(true);
-      return () => clearTimeout(timer);
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); io.disconnect(); } },
-      { threshold: 0.01, rootMargin: '50px' }
-    );
-    io.observe(el);
-    return () => { clearTimeout(timer); io.disconnect(); };
+    setVisible(true);
   }, []);
   return (
     <div
@@ -69,8 +58,8 @@ function Reveal({ children, className = '' }: { children: React.ReactNode; class
       className={className}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(16px)',
-        transition: 'opacity 0.6s cubic-bezier(.16,1,.3,1), transform 0.6s cubic-bezier(.16,1,.3,1)',
+        transform: 'translateY(0)',
+        transition: 'opacity 0.5s cubic-bezier(.16,1,.3,1), transform 0.5s cubic-bezier(.16,1,.3,1)',
       }}
     >
       {children}
@@ -169,7 +158,7 @@ export default function HomePage({
 }: HomePageProps) {
 
   const realProperties = propertiesList.filter(p =>
-    p.id && !p.id.startsWith('prop-') && p.isPublished !== false
+    Boolean(p.id) && p.isPublished !== false && !p.isClosedBase && !p.internalOnly && !p.crmOnly
   );
 
   const filteredProperties = realProperties.filter((p) => {
@@ -195,8 +184,10 @@ export default function HomePage({
   const previewProperties = filteredProperties.slice(0, 3);
   const formatPrice = (price: number) => `${price.toLocaleString('ru-RU')} BYN`;
 
-  /* === МОДАЛКА ДОКУМЕНТА === */
+  /* === МОДАЛКА ДОКУМЕНТА И СОСТОЯНИЯ ФОРМ === */
   const [openDoc, setOpenDoc] = useState<{ src: string; label: string; caption: string } | null>(null);
+  const [brokenDocs, setBrokenDocs] = useState<Record<number, boolean>>({});
+  const [heroSent, setHeroSent] = useState(false);
 
   useEffect(() => {
     if (!openDoc) return;
@@ -265,9 +256,11 @@ export default function HomePage({
                 if (phone) {
                   handleAddLead(name, phone, `Тип: ${type}`, 'Главный баннер');
                   form.reset();
+                  setHeroSent(true);
+                  setTimeout(() => setHeroSent(false), 5000);
                 }
               }}
-              className="flex flex-col sm:flex-row flex-wrap md:flex-nowrap items-stretch sm:items-center gap-3 w-full max-w-3xl mb-8"
+              className="flex flex-col sm:flex-row flex-wrap md:flex-nowrap items-stretch sm:items-center gap-3 w-full max-w-3xl mb-4"
             >
               <input
                 name="name"
@@ -302,6 +295,12 @@ export default function HomePage({
                 <ArrowRight className="w-4 h-4 hidden sm:inline" />
               </button>
             </form>
+            {heroSent && (
+              <div className="mb-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/25 border border-purple-400/40 text-purple-100 text-xs font-medium">
+                <CheckCircle className="w-4 h-4 text-purple-300" />
+                Спасибо! Заявка принята — специалист свяжется с вами в ближайшее время.
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
               <span className="inline-flex items-center gap-2 font-medium">
@@ -311,12 +310,12 @@ export default function HomePage({
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium">
                 <Users className="w-3.5 h-3.5 text-purple-300" />
-                340+ отзывов
+                1424+ клиентов выбрали нас
               </span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium">
                 <Clock className="w-3.5 h-3.5 text-purple-300" />
-                24/7 поддержка
+                Средний срок — 26 дней (мин. 2 дня)
               </span>
             </div>
           </div>
@@ -334,9 +333,9 @@ export default function HomePage({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { value: '5.0', label: 'Рейтинг Google Maps', icon: Star },
-                  { value: '1 000+', label: 'Сделок в год', icon: TrendingUp },
+                  { value: '1424+', label: 'Клиентов выбрали нас', icon: TrendingUp },
                   { value: '0', label: 'Оспоренных сделок', icon: ShieldCheck },
-                  { value: '60+', label: 'Экспертов', icon: Users },
+                  { value: '26 дней', label: 'Средний срок (мин. 2 дня)', icon: Clock },
                 ].map((item, i) => {
                   const Icon = item.icon;
                   return (
@@ -476,8 +475,8 @@ export default function HomePage({
                     { icon: ShieldCheck, t: 'Белгосстрах', d: 'Ответственность застрахована на 10 000 базовых величин' },
                     { icon: Scale, t: 'Госрегулирование', d: 'Работаем по тарифам, установленным Совмином' },
                     { icon: FileCheck, t: 'Юрист на сделке', d: 'Трёхэтапная проверка чистоты объекта' },
-                    { icon: Home, t: '500+ объектов', d: 'Собственная закрытая база недвижимости' },
-                    { icon: Clock, t: 'Срок 26 дней', d: 'Средний срок продажи квартиры' },
+                    { icon: Users, t: '1424+ клиентов', d: 'Выбрали нас для своих сделок с 2022 года' },
+                    { icon: Clock, t: 'Средний срок — 26 дней', d: 'Минимальный срок продажи — 2 дня' },
                     { icon: Award, t: 'Лицензия Минюста', d: '№ 02240/446 от 11.07.2022' },
                   ].map((item, i) => {
                     const Icon = item.icon;
@@ -895,23 +894,20 @@ export default function HomePage({
                       aria-label={`Открыть документ: ${doc.label}`}
                     >
                       <div className="relative aspect-[3/4] bg-stone-100 overflow-hidden">
-                        <img
-                          src={doc.src}
-                          alt={doc.label}
-                          loading="lazy"
-                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                          onError={(e) => {
-                            const img = e.currentTarget as HTMLImageElement;
-                            img.style.display = 'none';
-                            const parent = img.parentElement as HTMLElement;
-                            if (parent && !parent.querySelector('.doc-placeholder')) {
-                              const div = document.createElement('div');
-                              div.className = 'doc-placeholder absolute inset-0 flex flex-col items-center justify-center text-stone-400 gap-2 p-4 text-center';
-                              div.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span style="font-size:12px">Документ ${i + 1}</span>`;
-                              parent.appendChild(div);
-                            }
-                          }}
-                        />
+                        {!brokenDocs[i] ? (
+                          <img
+                            src={doc.src}
+                            alt={doc.label}
+                            loading="lazy"
+                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                            onError={() => setBrokenDocs((prev) => ({ ...prev, [i]: true }))}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-stone-400 gap-2 p-4 text-center">
+                            <FileCheck className="w-10 h-10 text-purple-400" />
+                            <span className="text-xs font-medium text-stone-500">Документ {i + 1}</span>
+                          </div>
+                        )}
                         <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                           Увеличить
                         </div>

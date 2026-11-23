@@ -48,6 +48,7 @@ interface AppContextType {
 
   loggedInAgent: Agent | null;
   setLoggedInAgent: (agent: Agent | null) => void;
+  logout: () => Promise<void>;
 
   currency: Currency;
   setCurrency: (c: Currency) => void;
@@ -179,17 +180,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const handleSetLoggedInAgent = useCallback((agent: Agent | null) => {
+    setLoggedInAgent(agent);
+    if (typeof window !== 'undefined') {
+      if (agent) {
+        safeSetItem('fp_logged_agent', agent);
+      } else {
+        try {
+          localStorage.removeItem('fp_logged_agent');
+        } catch {}
+      }
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.warn('[Providers] Logout request failed:', e);
+    }
+    handleSetLoggedInAgent(null);
+    setLeads([]);
+    setBuyers([]);
+    setSellers([]);
+    setTasks([]);
+  }, [handleSetLoggedInAgent]);
+
   useEffect(() => {
     const savedFavorites = safeGetItem('fp_favorites', []);
-    const savedAgent = safeGetItem('fp_logged_agent', null);
     const savedCurrency = safeGetItem('fp_currency', 'BYN');
 
     if (Array.isArray(savedFavorites) && savedFavorites.length) setFavorites(savedFavorites);
-    if (savedAgent) setLoggedInAgent(savedAgent);
     if (savedCurrency === 'BYN' || savedCurrency === 'USD') setCurrency(savedCurrency);
 
+    // Проверяем реальную серверную HMAC-сессию вместо слепого доверия localStorage
+    fetch('/api/auth/session')
+      .then(async (res) => {
+        if (!res.ok) {
+          handleSetLoggedInAgent(null);
+          return;
+        }
+        const data = await safeJson(res);
+        if (data?.authenticated && data?.agent) {
+          handleSetLoggedInAgent(data.agent);
+        } else {
+          handleSetLoggedInAgent(null);
+        }
+      })
+      .catch(() => {
+        handleSetLoggedInAgent(null);
+      });
+
     loadAll();
-  }, [loadAll]);
+  }, [loadAll, handleSetLoggedInAgent]);
+
+  useEffect(() => {
+    if (loggedInAgent?.id) {
+      loadCabinetData();
+    }
+  }, [loggedInAgent?.id, loadCabinetData]);
 
   // ==================== ACTIONS ====================
 
@@ -539,7 +588,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       syncWithRealt,
       loadCabinetData,
       loggedInAgent,
-      setLoggedInAgent,
+      setLoggedInAgent: handleSetLoggedInAgent,
+      logout,
       currency,
       setCurrency: handleSetCurrency,
       reload: loadAll,
@@ -555,7 +605,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       articles, setArticlesList,
       reviews, setReviewsList,
       isSyncing, syncWithRealt, loadCabinetData,
-      loggedInAgent, currency, handleSetCurrency, loadAll,
+      loggedInAgent, handleSetLoggedInAgent, logout, currency, handleSetCurrency, loadAll,
     ]
   );
 

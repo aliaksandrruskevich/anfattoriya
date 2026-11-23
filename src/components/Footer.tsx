@@ -42,7 +42,7 @@ const FORM_TEXTS: Record<string, { title: string; subtitle: string }> = {
   },
   catalog: {
     title: 'Не нашли подходящий объект?',
-    subtitle: 'Подберём вариант из закрытой базы за 30 минут.',
+    subtitle: 'Подберём актуальные варианты недвижимости под ваш запрос.',
   },
   'vybrat-agenta': {
     title: 'Нужна помощь в выборе риэлтера?',

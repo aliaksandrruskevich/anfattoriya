@@ -407,3 +407,23 @@ export interface InstitutionalRequest {
   createdAt: string;
   owners?: { fullName: string; birthDate: string; registration: string }[];
 }
+
+export interface KufarChat {
+  id: string;
+  kufar_ad_id?: string | null;
+  ad_title?: string | null;
+  client_name: string;
+  client_phone?: string | null;
+  last_message?: string | null;
+  last_message_date?: string | null;
+  status: 'new' | 'active' | 'closed' | string;
+  created_at?: string;
+}
+
+export interface KufarMessage {
+  id: string;
+  chat_id: string;
+  sender: 'client' | 'agent';
+  text: string;
+  created_at: string;
+}

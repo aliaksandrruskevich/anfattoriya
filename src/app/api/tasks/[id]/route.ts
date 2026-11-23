@@ -1,16 +1,38 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { execute, queryOne } from '@/lib/db';
+import { execute, isDbMockMode, queryOne } from '@/lib/db';
+import { isAdminRole, requireCrmSession } from '@/lib/auth';
+import { getMockStore } from '@/lib/mockStore';
+
+function canAccessTask(agent: any, task: any): boolean {
+  return isAdminRole(agent) || task.agentId === agent.id;
+}
 
 // GET /api/tasks/[id] — одна задача
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { id } = await params;
+
+    if (isDbMockMode()) {
+      const task = getMockStore().tasks.find((t) => t.id === id);
+      if (!task) return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+      if (!canAccessTask(auth.agent, task)) {
+        return NextResponse.json({ error: 'Нет доступа к задаче' }, { status: 403 });
+      }
+      return NextResponse.json(task);
+    }
+
     const task = await queryOne('SELECT * FROM crm_tasks WHERE id = ? LIMIT 1', [id]);
     if (!task) {
       return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+    }
+    if (!canAccessTask(auth.agent, task)) {
+      return NextResponse.json({ error: 'Нет доступа к задаче' }, { status: 403 });
     }
     return NextResponse.json(task);
   } catch (error: any) {
@@ -24,18 +46,46 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { id } = await params;
     const body = await request.json();
-
-    const fields: string[] = [];
-    const values: any[] = [];
+    const isAdmin = isAdminRole(auth.agent);
 
     const allowed = [
       'title', 'description', 'deadline', 'status', 'priority', 'clientId',
-      'clientName', 'clientPhone', 'clientAddress', 'agentId',
-      'assignedAgentName', 'actionType',
+      'clientName', 'clientPhone', 'clientAddress',
+      ...(isAdmin ? ['agentId', 'assignedAgentName'] : []),
+      'actionType',
     ];
+
+    if (isDbMockMode()) {
+      const store = getMockStore();
+      const idx = store.tasks.findIndex((t) => t.id === id);
+      if (idx === -1) return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+      if (!canAccessTask(auth.agent, store.tasks[idx])) {
+        return NextResponse.json({ error: 'Нет доступа к задаче' }, { status: 403 });
+      }
+      const next = { ...store.tasks[idx] };
+      for (const key of allowed) {
+        if (body[key] !== undefined) (next as any)[key] = body[key];
+      }
+      store.tasks[idx] = next;
+      return NextResponse.json(next);
+    }
+
+    const existing = await queryOne('SELECT * FROM crm_tasks WHERE id = ? LIMIT 1', [id]);
+    if (!existing) {
+      return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+    }
+    if (!canAccessTask(auth.agent, existing)) {
+      return NextResponse.json({ error: 'Нет доступа к задаче' }, { status: 403 });
+    }
+
+    const fields: string[] = [];
+    const values: any[] = [];
 
     for (const key of allowed) {
       if (body[key] !== undefined) {
@@ -49,14 +99,10 @@ export async function PUT(
     }
 
     values.push(id);
-    const result = await execute(
+    await execute(
       `UPDATE crm_tasks SET ${fields.join(', ')} WHERE id = ?`,
       values
     );
-
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
-    }
 
     const updated = await queryOne('SELECT * FROM crm_tasks WHERE id = ? LIMIT 1', [id]);
     return NextResponse.json(updated);
@@ -71,14 +117,32 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { id } = await params;
-    const result = await execute('DELETE FROM crm_tasks WHERE id = ?', [id]);
 
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+    if (isDbMockMode()) {
+      const store = getMockStore();
+      const idx = store.tasks.findIndex((t) => t.id === id);
+      if (idx === -1) return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+      if (!canAccessTask(auth.agent, store.tasks[idx])) {
+        return NextResponse.json({ error: 'Нет прав на удаление задачи' }, { status: 403 });
+      }
+      store.tasks.splice(idx, 1);
+      return NextResponse.json({ ok: true });
     }
 
+    const existing = await queryOne('SELECT * FROM crm_tasks WHERE id = ? LIMIT 1', [id]);
+    if (!existing) {
+      return NextResponse.json({ error: 'Задача не найдена' }, { status: 404 });
+    }
+    if (!canAccessTask(auth.agent, existing)) {
+      return NextResponse.json({ error: 'Нет прав на удаление задачи' }, { status: 403 });
+    }
+
+    await execute('DELETE FROM crm_tasks WHERE id = ?', [id]);
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error('[DELETE /api/tasks/[id]]', error);

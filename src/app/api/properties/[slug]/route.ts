@@ -1,6 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { execute, queryOne } from '@/lib/db';
+import { execute, isDbMockMode, queryOne } from '@/lib/db';
 import { getPropertyBySlug } from '@/lib/repository';
+import {
+  getSessionAgent,
+  isAdminRole,
+  isCallCenterRole,
+  requireCrmSession,
+} from '@/lib/auth';
+import { getMockStore } from '@/lib/mockStore';
+import { isPublicProperty, sanitizePropertyForPublic } from '@/lib/sanitize';
 
 // GET /api/properties/[slug] — один объект
 export async function GET(
@@ -9,10 +17,20 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
+    const session = await getSessionAgent();
     const property = await getPropertyBySlug(slug);
+
     if (!property) {
       return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
     }
+
+    if (!session) {
+      if (!isPublicProperty(property)) {
+        return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
+      }
+      return NextResponse.json(sanitizePropertyForPublic(property));
+    }
+
     return NextResponse.json(property);
   } catch (error: any) {
     console.error('[GET /api/properties/[slug]]', error);
@@ -20,36 +38,76 @@ export async function GET(
   }
 }
 
-// PUT /api/properties/[slug] — обновить объект
+// PUT /api/properties/[slug] — обновить объект (CRM)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { slug } = await params;
     const body = await request.json();
-
-    // Ищем по slug / externalId / id
-    const existing = await queryOne(
-      'SELECT id FROM properties WHERE slug = ? OR externalId = ? OR id = ? LIMIT 1',
-      [slug, slug, slug]
-    );
-    if (!existing) {
-      return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
-    }
-
-    const fields: string[] = [];
-    const values: any[] = [];
 
     const allowed = [
       'title', 'type', 'address', 'priceBYN', 'priceUSD', 'rooms', 'area',
       'floor', 'totalFloors', 'photo', 'image', 'description', 'status',
       'agentName', 'agentPhone', 'assignedAgentId', 'assignedAgentName',
+      'sellerPhone', 'contractStatus', 'contractNumber', 'contractDate',
+      'sourceUrl', 'inventoryNo', 'priority',
       'district', 'metro', 'city', 'street', 'houseNumber', 'slug',
     ];
-
     const jsonFields = ['features', 'photos', 'images', 'priceHistory'];
     const boolFields = ['isPublished', 'internalOnly', 'crmOnly', 'isClosedBase'];
+
+    if (isDbMockMode()) {
+      const store = getMockStore();
+      const idx = store.properties.findIndex((p) => p.slug === slug || p.id === slug);
+      if (idx === -1) {
+        return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
+      }
+      const existing = store.properties[idx];
+      if (
+        !isAdminRole(auth.agent) &&
+        !isCallCenterRole(auth.agent) &&
+        existing.assignedAgentId &&
+        existing.assignedAgentId !== auth.agent.id
+      ) {
+        return NextResponse.json({ error: 'Нет прав на изменение чужого объекта' }, { status: 403 });
+      }
+      const next = { ...existing };
+      for (const key of allowed) {
+        if (body[key] !== undefined) (next as any)[key] = body[key];
+      }
+      for (const key of jsonFields) {
+        if (body[key] !== undefined) (next as any)[key] = body[key];
+      }
+      for (const key of boolFields) {
+        if (body[key] !== undefined) (next as any)[key] = Boolean(body[key]);
+      }
+      store.properties[idx] = next;
+      return NextResponse.json(next);
+    }
+
+    const existing = await queryOne(
+      'SELECT id, assignedAgentId FROM properties WHERE slug = ? OR externalId = ? OR id = ? LIMIT 1',
+      [slug, slug, slug]
+    );
+    if (!existing) {
+      return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
+    }
+    if (
+      !isAdminRole(auth.agent) &&
+      !isCallCenterRole(auth.agent) &&
+      existing.assignedAgentId &&
+      existing.assignedAgentId !== auth.agent.id
+    ) {
+      return NextResponse.json({ error: 'Нет прав на изменение чужого объекта' }, { status: 403 });
+    }
+
+    const fields: string[] = [];
+    const values: any[] = [];
 
     for (const key of allowed) {
       if (body[key] !== undefined) {
@@ -85,19 +143,48 @@ export async function PUT(
   }
 }
 
-// DELETE /api/properties/[slug] — удалить объект
+// DELETE /api/properties/[slug] — удалить объект (CRM)
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const auth = await requireCrmSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { slug } = await params;
+
+    if (isDbMockMode()) {
+      const store = getMockStore();
+      const idx = store.properties.findIndex((p) => p.slug === slug || p.id === slug);
+      if (idx === -1) {
+        return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
+      }
+      const existing = store.properties[idx];
+      if (
+        !isAdminRole(auth.agent) &&
+        existing.assignedAgentId &&
+        existing.assignedAgentId !== auth.agent.id
+      ) {
+        return NextResponse.json({ error: 'Нет прав на удаление чужого объекта' }, { status: 403 });
+      }
+      store.properties.splice(idx, 1);
+      return NextResponse.json({ ok: true });
+    }
+
     const existing = await queryOne(
-      'SELECT id FROM properties WHERE slug = ? OR externalId = ? OR id = ? LIMIT 1',
+      'SELECT id, assignedAgentId FROM properties WHERE slug = ? OR externalId = ? OR id = ? LIMIT 1',
       [slug, slug, slug]
     );
     if (!existing) {
       return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
+    }
+    if (
+      !isAdminRole(auth.agent) &&
+      existing.assignedAgentId &&
+      existing.assignedAgentId !== auth.agent.id
+    ) {
+      return NextResponse.json({ error: 'Нет прав на удаление чужого объекта' }, { status: 403 });
     }
 
     await execute('DELETE FROM properties WHERE id = ?', [existing.id]);

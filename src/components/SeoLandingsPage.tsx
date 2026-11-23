@@ -523,7 +523,7 @@ export default function SeoLandingsPage({
               В открытом каталоге пока нет свободных объектов в {currentDistrict.name} с выбранными параметрами
             </h3>
             <p className="text-xs text-neutral-500 max-w-lg mx-auto leading-relaxed">
-              В нашей внутренней межагентской базе прямо сейчас доступно более 18 эксклюзивных вариантов от собственников в районе {currentDistrict.name}. Оставьте заявку — наш риэлтер пришлет свежую подборку вариантов без комиссии.
+              Оставьте параметры поиска — наш риэлтер подберёт актуальные варианты от собственников в районе {currentDistrict.name} и сразу свяжется с вами.
             </p>
             <button
               onClick={() => {
@@ -532,7 +532,7 @@ export default function SeoLandingsPage({
               }}
               className="px-6 py-3 bg-neutral-900 hover:bg-purple-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors shadow-md cursor-pointer"
             >
-              Запросить объекты из закрытой базы
+              Подобрать объект в {currentDistrict.name}
             </button>
           </div>
         )}

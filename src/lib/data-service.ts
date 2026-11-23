@@ -1,6 +1,12 @@
-import { execute, query, queryOne } from './db';
+import { execute, isDbMockMode, query, queryOne } from './db';
 import { getAgents } from './repository';
 import { matchAgentByName } from './matchAgent';
+import { getMockStore } from './mockStore';
+import {
+  isPublicProperty,
+  sanitizeAgentForPublic,
+  sanitizePropertyForPublic,
+} from './sanitize';
 import type { Property } from '../types';
 
 const REALT_FEED_URL = process.env.REALT_FEED_URL || '';
@@ -245,42 +251,79 @@ export async function syncRealtToDb(): Promise<{ ok: boolean; count: number; err
 export async function getRealtData(force: boolean = false) {
   void force;
 
+  if (isDbMockMode()) {
+    const store = getMockStore();
+    const agents = (await getAgents()).map(sanitizeAgentForPublic);
+    const properties = store.properties
+      .filter(isPublicProperty)
+      .map(sanitizePropertyForPublic);
+
+    return {
+      properties,
+      agents,
+      lastSync: Date.now(),
+      fromCache: false,
+    };
+  }
+
   const [propertyRows, agents] = await Promise.all([
     query(
       `SELECT * FROM properties
        WHERE status = 'active'
          AND isPublished = 1
          AND (isClosedBase = 0 OR isClosedBase IS NULL)
+         AND (internalOnly = 0 OR internalOnly IS NULL)
+         AND (crmOnly = 0 OR crmOnly IS NULL)
        ORDER BY createdAt DESC`
     ),
     getAgents(),
   ]);
 
   return {
-    properties: propertyRows.map(rowToProperty),
-    agents,
+    properties: propertyRows.map(rowToProperty).map(sanitizePropertyForPublic),
+    agents: agents.map(sanitizeAgentForPublic),
     lastSync: Date.now(),
     fromCache: false,
   };
 }
 
 export async function getPropertyBySlug(slug: string): Promise<Property | null> {
+  if (isDbMockMode()) {
+    const store = getMockStore();
+    const found = store.properties.find(
+      (p) => (p.slug === slug || p.id === slug) && isPublicProperty(p)
+    );
+    return found ? sanitizePropertyForPublic(found) : null;
+  }
+
   const row = await queryOne(
     `SELECT * FROM properties
      WHERE (slug = ? OR externalId = ? OR id = ?)
        AND status = 'active'
        AND isPublished = 1
+       AND (isClosedBase = 0 OR isClosedBase IS NULL)
+       AND (internalOnly = 0 OR internalOnly IS NULL)
+       AND (crmOnly = 0 OR crmOnly IS NULL)
      LIMIT 1`,
     [slug, slug, slug]
   );
-  return row ? rowToProperty(row) : null;
+  return row ? sanitizePropertyForPublic(rowToProperty(row)) : null;
 }
 
 export async function getAllPropertySlugs(): Promise<string[]> {
+  if (isDbMockMode()) {
+    return getMockStore().properties
+      .filter((p) => isPublicProperty(p) && p.slug)
+      .map((p) => p.slug as string);
+  }
+
   const rows = await query(
     `SELECT slug FROM properties
      WHERE status = 'active'
        AND isPublished = 1
+       AND (isClosedBase = 0 OR isClosedBase IS NULL)
+       AND (internalOnly = 0 OR internalOnly IS NULL)
+       AND (crmOnly = 0 OR crmOnly IS NULL)
        AND slug IS NOT NULL`
   );
   return rows.map((r) => r.slug).filter((s): s is string => Boolean(s));

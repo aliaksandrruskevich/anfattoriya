@@ -122,7 +122,7 @@ export default function KorporativnayaArendaPage({ activePage, navigateTo, handl
 
   const processSteps = [
     { icon: <ScanSearch className="w-4 h-4" />, title: 'Заявка и бриф', desc: 'Уточняем требования: площадь, бюджет, локацию, сроки заезда и особые условия.', duration: '1 день' },
-    { icon: <Building2 className="w-4 h-4" />, title: 'Персональный подбор', desc: 'Формируем шорт-лист объектов из открытой и закрытой базы под ваш бриф.', duration: '1–3 дня' },
+    { icon: <Building2 className="w-4 h-4" />, title: 'Персональный подбор', desc: 'Формируем шорт-лист объектов из актуального каталога и новых предложений собственников под ваш бриф.', duration: '1–3 дня' },
     { icon: <ClipboardCheck className="w-4 h-4" />, title: 'Показы и согласование', desc: 'Организуем просмотры, ведём переговоры об условиях аренды и сроке договора.', duration: '3–7 дней' },
     { icon: <FileText className="w-4 h-4" />, title: 'Договор и документы', desc: 'Готовим договор аренды, акты приёма-передачи и закрывающие документы.', duration: '1–2 дня' },
     { icon: <Handshake className="w-4 h-4" />, title: 'Сопровождение', desc: 'Остаёмся на связи весь срок аренды — от продления до смены условий.', duration: 'весь период' },
@@ -312,7 +312,7 @@ export default function KorporativnayaArendaPage({ activePage, navigateTo, handl
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><Users className="w-4 h-4" style={{ color: brass }} /><h3 className="text-sm font-bold text-neutral-900">Сайт агентства</h3></div>
                 <div className="w-full h-px border-b border-dashed" style={{ borderColor: `${brass}33` }}></div>
-                <p className="text-xs text-stone-500">105 000+ посетителей в месяц.</p>
+                <p className="text-xs text-stone-500">1424+ клиентов выбрали нас для своих сделок.</p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><Scale className="w-4 h-4" style={{ color: brass }} /><h3 className="text-sm font-bold text-neutral-900">Стоимость</h3></div>
@@ -333,7 +333,7 @@ export default function KorporativnayaArendaPage({ activePage, navigateTo, handl
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2"><Clock className="w-4 h-4" style={{ color: brass }} /><h3 className="text-sm font-bold text-neutral-900">Срок продажи</h3></div>
                   <div className="w-full h-px border-b border-dashed" style={{ borderColor: `${brass}33` }}></div>
-                  <p className="text-xs text-stone-500">Средний срок — 26 дней.</p>
+                  <p className="text-xs text-stone-500">Средний срок — 26 дней, минимальный — 2 дня.</p>
                 </div>
               </div>
             </div>
@@ -341,12 +341,12 @@ export default function KorporativnayaArendaPage({ activePage, navigateTo, handl
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><FileText className="w-4 h-4" style={{ color: brass }} /><h3 className="text-sm font-bold text-neutral-900">Юристы</h3></div>
                 <div className="w-full h-px border-b border-dashed" style={{ borderColor: `${brass}33` }}></div>
-                <p className="text-xs text-stone-500">Большой юридический отдел в штате.</p>
+                <p className="text-xs text-stone-500">Профильный юридический отдел в штате.</p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><ScanSearch className="w-4 h-4" style={{ color: brass }} /><h3 className="text-sm font-bold text-neutral-900">Реклама</h3></div>
                 <div className="w-full h-px border-b border-dashed" style={{ borderColor: `${brass}33` }}></div>
-                <p className="text-xs text-stone-500">14 сайтов, соцсети, закрытые базы.</p>
+                <p className="text-xs text-stone-500">Ведущие площадки, соцсети и прямой подбор.</p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2"><BadgeCheck className="w-4 h-4" style={{ color: brass }} /><h3 className="text-sm font-bold text-neutral-900">Доверие</h3></div>

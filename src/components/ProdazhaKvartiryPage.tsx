@@ -106,7 +106,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
     },
     {
       title: 'Элитные пентхаусы и клубные дома',
-      desc: 'Введенские ворота, Ваньковича, Дрозды, Сторожовская. Закрытые показы для проверенных состоятельных покупателей из закрытой базы без лишнего публичного шума.',
+      desc: 'Введенские ворота, Ваньковича, Дрозды, Сторожовская. Индивидуальные показы для проверенных состоятельных покупателей без лишнего публичного шума.',
       photo: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=800',
       tag: 'Конфиденциальные сделки'
     }
@@ -147,7 +147,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
   const faqItems = [
     {
       q: 'Сколько времени занимает продажа квартиры с АН «Фаттория»?',
-      a: 'Средний срок выхода на предварительный договор с реальным покупателем в нашем агентстве составляет от 14 до 28 дней. За счет качественного хоум-стейджинга, платного приоритетного размещения на ключевых порталах и оперативной рассылки по закрытой базе покупателей мы закрываем сделки быстрее среднерыночных показателей без потери в цене.'
+      a: 'Средний срок продажи в нашем агентстве — 26 дней, минимальный — 2 дня. За счет качественного хоум-стейджинга, приоритетного размещения на ключевых порталах и работы с актуальными заявками покупателей мы закрываем сделки оперативно и без потери в цене.'
     },
     {
       q: 'Какова комиссия агентства при продаже квартиры?',
@@ -208,13 +208,13 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
               className="text-[17px] lg:text-[21px] font-light leading-relaxed max-w-3xl mb-8 text-white/90"
               style={{ textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}
             >
-              Продадим вашу квартиру по максимальной рыночной цене без нервов и риска за 14–28 дней. С 2022 года АН «Фаттория» провело сотни успешных квартирных сделок. Профессиональный хоум-стейджинг, закрытая база покупателей и государственные тарифы Минюста РБ (от 1.5% до 6%).
+              Продадим вашу квартиру по максимальной рыночной цене без нервов и риска. 1424+ клиентов выбрали нас для своих сделок. Средний срок — 26 дней, минимальный — 2 дня. Профессиональный хоум-стейджинг, персональный подбор покупателей и государственные тарифы Минюста РБ (от 1.5% до 6%).
             </p>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
               <span className="inline-flex items-center gap-2 font-medium"><Calendar className="w-3.5 h-3.5 text-amber-400" /> Опыт с 2022 года</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
-              <span className="inline-flex items-center gap-2 font-medium"><Clock className="w-3.5 h-3.5 text-amber-300" /> Срок сделки 14–28 дней</span>
+              <span className="inline-flex items-center gap-2 font-medium"><Clock className="w-3.5 h-3.5 text-amber-300" /> Средний срок — 26 дней (мин. 2 дня)</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium"><Shield className="w-3.5 h-3.5 text-emerald-400" /> Гарантия безопасности БТИ</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
@@ -282,7 +282,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
                 <Award className="w-4 h-4" /> Статистика с 2022 года
               </div>
               <p className="text-xs leading-relaxed text-stone-600">
-                Более 340 завершенных сделок по квартирам в Минске. Средний срок нахождения реального покупателя — 21 день.
+                1424+ клиентов выбрали нас для своих сделок. Средний срок — 26 дней, минимальный — 2 дня.
               </p>
             </div>
           </aside>
@@ -362,7 +362,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
                   С момента основания в 2022 году АН «Фаттория» сосредоточилось на решении наиболее сложных квартирных задач на территории Минска и Минского района. Мы не просто размещаем объявление в интернете — мы берем на себя полную ответственность за исход сделки.
                 </p>
                 <p>
-                  За годы работы с 2022 года мы накопили внушительную базу постоянных инвесторов и покупателей, которые ищут жилье для себя и сдачи в аренду. В 42% случаев покупатель на квартиру находится в первые 10 дней именно из нашего внутреннего закрытого реестра заявок еще до выхода объекта на массовый рынок.
+                  За годы работы с 2022 года мы сформировали системную работу с активными заявками покупателей и инвесторов, которые ищут жилье для себя и сдачи в аренду. Это позволяет находить первых заинтересованных претендентов уже в первые дни продажи.
                 </p>
               </div>
 
@@ -375,7 +375,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
                 />
                 <div className="p-4 bg-stone-50 text-xs text-stone-500 flex items-center justify-between border-t border-stone-200">
                   <span>ЖК «Новая Боровая», 3-комнатная квартира, реализованная АН «Фаттория»</span>
-                  <span className="font-semibold text-stone-700">Продана за 24 дня</span>
+                  <span className="font-semibold text-stone-700">Средний срок — 26 дней</span>
                 </div>
               </div>
             </section>

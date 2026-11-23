@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Heart, Search, Phone, ChevronDown, UserCheck, Sparkles, Users } from 'lucide-react';
+import { Menu, X, Heart, Search, Phone, ChevronDown, UserCheck, Sparkles } from 'lucide-react';
 import { useApp } from '@/app/Providers';
 import CompanyLogo from './CompanyLogo';
 
@@ -182,11 +182,6 @@ export default function Navigation({
 
           <div className="hidden xl:flex items-center justify-center mt-3 pt-2.5 border-t border-white/15 text-xs font-bold uppercase tracking-wider text-white" style={{ fontFamily: 'Raleway, sans-serif' }}>
             <div className="flex flex-wrap items-center justify-center gap-4 xl:gap-6">
-              <Link href="/baza-pokupatelej" className={`hover:text-purple-400 cursor-pointer flex items-center gap-1.5 whitespace-nowrap font-bold ${isActive('/baza-pokupatelej') ? 'text-purple-400' : 'text-purple-400/90'}`}>
-                <Users className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span>База покупателей</span>
-                <span className="bg-purple-500 text-neutral-950 text-[10px] font-black rounded-full px-1.5 py-0.2 shadow-sm"></span>
-              </Link>
               <Link href="/otzyvy-klientov" className={`hover:text-purple-400 cursor-pointer whitespace-nowrap ${isActive('/otzyvy-klientov') ? 'text-purple-400 font-bold' : ''}`}>Наши клиенты</Link>
 
               <div className="relative">
@@ -258,16 +253,6 @@ export default function Navigation({
         {mobileMenuOpen && (
           <div className="xl:hidden absolute top-full left-0 right-0 bg-neutral-950/98 backdrop-blur-2xl border-t border-white/10 p-4 sm:p-6 space-y-4 max-h-[85vh] overflow-y-auto rounded-b-3xl shadow-2xl animate-fadeIn z-[60]">
             <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-              <Link href="/baza-pokupatelej" className="col-span-2 text-left px-4 py-3 rounded-2xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-400 font-extrabold flex items-center justify-between transition-all">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-purple-400" />
-                  <span>👥 База покупателей</span>
-                </div>
-                <span className="px-2.5 py-0.5 text-[10px] bg-purple-500 text-neutral-950 font-black rounded-full shadow-xs">
-                  активные
-                </span>
-              </Link>
-
               <Link href="/catalog" className="text-left px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-purple-400 font-bold flex items-center justify-between border border-white/5">
                 <span>🏙️ Каталог</span>
               </Link>

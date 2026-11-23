@@ -12,19 +12,20 @@ import {
 import { Article, PageId } from '../types';
 import { getArticleFullUrl, resolveArticleFromSlug, getArticleUrl } from '../lib/routes';
 import { ARTICLE_DISCLAIMER } from '../data';
+import { sanitizeRichHtml } from '../lib/sanitize';
 
 /* ============================================================
-   Премиальная дизайн-система роскошного журнала недвижимости
+   Премиальная дизайн-система журнала недвижимости АН Фаттория
    ============================================================ */
-const brandAccent = '#92400E';
-const brandAccentDark = '#78350F';
-const brandAccentSoft = '#FEF3C7';
-const paper = '#FBF9F5';
+const brandAccent = '#7C3AED';
+const brandAccentDark = '#6D28D9';
+const brandAccentSoft = '#EDE9FE';
+const paper = '#FAF8FC';
 const paperCard = '#FFFFFF';
 const ink = '#171412';
 const inkSoft = '#473F3A';
 const inkMuted = '#786F68';
-const borderLine = '#E7E2D8';
+const borderLine = '#E7E2EA';
 const displayFont = "'Cormorant Garamond', 'Georgia', serif";
 const bodyFont = "'Raleway', system-ui, sans-serif";
 
@@ -224,6 +225,7 @@ export default function NewsPage({
   const [fontSize, setFontSize] = useState<FontSize>('base');
   const [shareCopied, setShareCopied] = useState(false);
   const [scrollPercent, setScrollPercent] = useState(0);
+  const [bannerSent, setBannerSent] = useState(false);
 
   useEffect(() => {
     if (selectedArticle) window.scrollTo({ top: 0 });
@@ -314,15 +316,15 @@ export default function NewsPage({
             strong: ({ children }) => <strong className="font-semibold text-stone-900">{children}</strong>,
             em: ({ children }) => <em className="italic">{children}</em>,
             ul: ({ children }) => <ul className="my-6 space-y-3 pl-2">{children}</ul>,
-            ol: ({ children }) => <ol className="my-6 space-y-3 list-decimal pl-6 marker:text-amber-800 marker:font-semibold">{children}</ol>,
+            ol: ({ children }) => <ol className="my-6 space-y-3 list-decimal pl-6 marker:text-purple-700 marker:font-semibold">{children}</ol>,
             li: ({ children }) => (
               <li className={`${fontStyles[fontSize]} flex items-start gap-3`}>
-                <span className="mt-[11px] w-2 h-2 rounded-full shrink-0 bg-amber-800" aria-hidden />
+                <span className="mt-[11px] w-2 h-2 rounded-full shrink-0 bg-purple-700" aria-hidden />
                 <div className="flex-1 min-w-0">{children}</div>
               </li>
             ),
             blockquote: ({ children }) => (
-              <blockquote className="my-10 relative pl-7 pr-6 py-6 rounded-2xl bg-amber-50/80 border-l-4 border-amber-700 shadow-sm">
+              <blockquote className="my-10 relative pl-7 pr-6 py-6 rounded-2xl bg-purple-50/80 border-l-4 border-purple-600 shadow-sm">
                 <div className="italic text-[18px] md:text-[21px] leading-relaxed text-stone-900 m-0" style={{ fontFamily: displayFont }}>
                   {children}
                 </div>
@@ -346,13 +348,13 @@ export default function NewsPage({
             th: ({ children }) => <th className="py-3 px-4 text-[11px] font-semibold uppercase tracking-wider text-stone-700">{children}</th>,
             td: ({ children }) => <td className="py-3 px-4 text-[14px] leading-relaxed text-stone-700">{children}</td>,
             a: ({ children, href }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-4 decoration-1 transition-colors text-amber-900 hover:text-amber-700">
+              <a href={href} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-4 decoration-1 transition-colors text-purple-700 hover:text-purple-900">
                 {children}
               </a>
             ),
           }}
         >
-          {content}
+          {sanitizeRichHtml(content)}
         </ReactMarkdown>
       </div>
     );
@@ -361,7 +363,7 @@ export default function NewsPage({
   return (
     <div className="hp-root min-h-screen" style={{ backgroundColor: paper, fontFamily: bodyFont, color: inkSoft }}>
       <style>{`
-        .hp-root ::selection { background: #FEF3C7; color: #171412; }
+        .hp-root ::selection { background: #EDE9FE; color: #171412; }
         .article-content p, .article-content li { color: #2D2723; }
         .article-content > p:first-child::first-letter {
           font-family: ${displayFont};
@@ -379,7 +381,7 @@ export default function NewsPage({
 
       {selectedArticle && (
         <div className="fixed top-0 left-0 right-0 h-[3px] pointer-events-none z-50 bg-stone-200">
-          <div className="h-full transition-all duration-100 bg-amber-700" style={{ width: `${scrollPercent}%` }} />
+          <div className="h-full transition-all duration-100 bg-purple-600" style={{ width: `${scrollPercent}%` }} />
         </div>
       )}
 
@@ -414,7 +416,7 @@ export default function NewsPage({
 
                 <h1 className="text-white mb-6" style={{ fontFamily: displayFont, fontWeight: 300, fontSize: 'clamp(36px, 5.5vw, 68px)', lineHeight: 1.08, letterSpacing: '-0.02em', textShadow: '0 4px 20px rgba(0,0,0,0.7)' }}>
                   Журнал «АН Фаттория»:<br />
-                  <em className="text-amber-200" style={{ fontStyle: 'italic' }}>Законы, практика</em> и аналитика рынка
+                  <em className="text-purple-300" style={{ fontStyle: 'italic' }}>Законы, практика</em> и аналитика рынка
                 </h1>
 
                 <p className="text-[17px] lg:text-[19px] font-light leading-relaxed max-w-2xl text-white/90 mb-6" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>
@@ -439,24 +441,31 @@ export default function NewsPage({
                     if (phone) {
                       handleAddLead(name, phone, `Тип: ${type}`, 'Баннер статей');
                       form.reset();
-                      alert('Спасибо! Ваш вопрос передан аттестованному риэлтеру.');
+                      setBannerSent(true);
+                      setTimeout(() => setBannerSent(false), 5000);
                     }
                   }}
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-4xl"
                 >
-                  <input name="name" type="text" placeholder="Ваше имя" className="hp-glass px-4 py-3.5 text-white placeholder-white/70 focus:outline-none focus:border-white transition-colors text-[14px] rounded-xl" />
-                  <input name="phone" type="tel" required placeholder="Номер телефона *" className="hp-glass px-4 py-3.5 text-white placeholder-white/70 focus:outline-none focus:border-white transition-colors text-[14px] rounded-xl" />
-                  <select name="type" className="hp-glass px-4 py-3.5 text-white focus:outline-none focus:border-white transition-colors text-[14px] rounded-xl appearance-none bg-stone-900/80">
+                  <input name="name" type="text" placeholder="Ваше имя" className="hp-glass px-4 py-3.5 text-white placeholder-white/70 focus:outline-none focus:border-purple-400 transition-colors text-[14px] rounded-xl" />
+                  <input name="phone" type="tel" required placeholder="Номер телефона *" className="hp-glass px-4 py-3.5 text-white placeholder-white/70 focus:outline-none focus:border-purple-400 transition-colors text-[14px] rounded-xl" />
+                  <select name="type" className="hp-glass px-4 py-3.5 text-white focus:outline-none focus:border-purple-400 transition-colors text-[14px] rounded-xl appearance-none bg-stone-900/80">
                     <option value="Комиссия (от 1.5% до 6%)">Комиссия (от 1.5% до 6%)</option>
                     <option value="Оценка">Оценка недвижимости</option>
                     <option value="Проверка">Юридическая проверка</option>
                     <option value="Продажа">Продажа объекта</option>
                     <option value="Покупка">Покупка новостройки</option>
                   </select>
-                  <button type="submit" className="px-6 py-3.5 font-semibold text-[14px] rounded-xl bg-white text-stone-900 transition-all hover:bg-stone-100 hover:scale-[1.02] shadow-lg">
+                  <button type="submit" className="px-6 py-3.5 font-semibold text-[14px] rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white transition-all hover:scale-[1.02] shadow-lg shadow-purple-600/30 cursor-pointer">
                     Задать вопрос
                   </button>
                 </form>
+                {bannerSent && (
+                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/25 border border-purple-400/40 text-purple-100 text-xs font-medium">
+                    <CheckCircle className="w-4 h-4 text-purple-300" />
+                    Спасибо! Ваш вопрос передан аттестованному риэлтеру.
+                  </div>
+                )}
               </div>
             </div>
           </Cover>
@@ -464,7 +473,7 @@ export default function NewsPage({
           <section className="max-w-[1400px] mx-auto px-6 lg:px-10 pt-14 lg:pt-20">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-8 border-b" style={{ borderColor: borderLine }}>
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+                <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                   Все {articlesList.length || 48} публикаций
                 </div>
                 <h2 className="text-[30px] lg:text-[40px] leading-tight text-stone-900" style={{ fontFamily: displayFont, fontWeight: 400, letterSpacing: '-0.01em' }}>
@@ -498,8 +507,8 @@ export default function NewsPage({
                   onClick={() => setSearchQuery(searchQuery === t.query ? '' : t.query)}
                   className={`text-[12px] px-3.5 py-1.5 rounded-full border transition-all ${
                     searchQuery === t.query
-                      ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
-                      : 'bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-400'
+                      ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white border-purple-600 shadow-sm'
+                      : 'bg-white text-stone-700 hover:bg-purple-50 hover:border-purple-300'
                   }`}
                   style={{ borderColor: borderLine }}
                 >
@@ -555,7 +564,7 @@ export default function NewsPage({
                         {categoryLabel(spotlight.category, true)}
                       </span>
                     </div>
-                    <h3 className="text-white mb-4 transition-colors group-hover:text-amber-200" style={{ fontFamily: displayFont, fontWeight: 300, fontSize: 'clamp(26px, 3.5vw, 44px)', lineHeight: 1.15, textShadow: '0 4px 16px rgba(0,0,0,0.8)' }}>
+                    <h3 className="text-white mb-4 transition-colors group-hover:text-purple-200" style={{ fontFamily: displayFont, fontWeight: 300, fontSize: 'clamp(26px, 3.5vw, 44px)', lineHeight: 1.15, textShadow: '0 4px 16px rgba(0,0,0,0.8)' }}>
                       {spotlight.title}
                     </h3>
                     <p className="text-[15px] lg:text-[17px] font-light leading-relaxed max-w-2xl text-white/90 mb-6" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
@@ -612,7 +621,7 @@ export default function NewsPage({
 function H({ children, id, level }: { children: React.ReactNode; id?: string; level: 1 | 2 | 3 | 4 }) {
   if (level === 4) {
     return (
-      <h4 className="mt-10 mb-4 text-[12px] font-semibold uppercase tracking-[0.2em] text-amber-900">
+      <h4 className="mt-10 mb-4 text-[12px] font-semibold uppercase tracking-[0.2em] text-purple-700">
         {children}
       </h4>
     );
@@ -624,7 +633,7 @@ function H({ children, id, level }: { children: React.ReactNode; id?: string; le
   };
   return (
     <h2 id={id} className="mt-14 mb-6 scroll-mt-36 flex items-start gap-3.5 text-stone-900" style={{ fontFamily: displayFont, fontWeight: 400, fontSize: sizes[level], lineHeight: 1.2, letterSpacing: '-0.01em' }}>
-      <span className="mt-[0.55em] h-[3px] w-8 shrink-0 rounded-full bg-amber-800" />
+      <span className="mt-[0.55em] h-[3px] w-8 shrink-0 rounded-full bg-purple-600" />
       <span>{children}</span>
     </h2>
   );
@@ -636,7 +645,7 @@ function Chip({ active, onClick, children, small }: { active: boolean; onClick: 
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 font-medium transition-all duration-200 border rounded-full hover:-translate-y-0.5 ${small ? 'px-3.5 py-1.5 text-[11px]' : 'px-5 py-2.5 text-[12px]'}`}
       style={active
-        ? { backgroundColor: ink, color: '#fff', borderColor: ink }
+        ? { backgroundColor: brandAccent, color: '#fff', borderColor: brandAccent }
         : { color: inkSoft, borderColor: borderLine, backgroundColor: '#fff' }}
     >
       {children}
@@ -677,14 +686,14 @@ function ArticleCard({ article, index, bookmarked, onToggleBookmark, onClick, ra
           {String(index).padStart(2, '0')}
         </div>
         {isTop && (
-          <span className="absolute bottom-4 right-4 text-[10px] font-semibold uppercase tracking-[0.15em] text-white px-3 py-1.5 rounded-full bg-stone-900/90 backdrop-blur-sm border border-white/20">
+          <span className="absolute bottom-4 right-4 text-[10px] font-semibold uppercase tracking-[0.15em] text-white px-3 py-1.5 rounded-full bg-purple-700/90 backdrop-blur-sm border border-purple-300/30">
             Рекомендуем
           </span>
         )}
       </Cover>
 
       <div className="flex flex-col flex-1 p-7">
-        <h3 className="mb-3 transition-colors duration-300 group-hover:text-amber-800 text-stone-900" style={{ fontFamily: displayFont, fontWeight: 400, fontSize: '21px', lineHeight: 1.28, letterSpacing: '-0.005em' }}>
+        <h3 className="mb-3 transition-colors duration-300 group-hover:text-purple-700 text-stone-900" style={{ fontFamily: displayFont, fontWeight: 400, fontSize: '21px', lineHeight: 1.28, letterSpacing: '-0.005em' }}>
           {article.title}
         </h3>
         <p className="text-[14px] leading-relaxed mb-6 flex-1 line-clamp-3 text-stone-600 font-light">
@@ -741,8 +750,8 @@ function ArticleView({
             </h1>
 
             {/* ⚠️ СНОСКА-ДИСКЛЕЙМЕР (сверху, под заголовком) */}
-            <div className="mb-5 inline-flex items-start gap-3 max-w-3xl px-4 py-3 rounded-xl bg-amber-100/15 border border-amber-200/30 backdrop-blur-sm">
-              <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-200" aria-hidden />
+            <div className="mb-5 inline-flex items-start gap-3 max-w-3xl px-4 py-3 rounded-xl bg-purple-500/15 border border-purple-300/30 backdrop-blur-sm">
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-purple-200" aria-hidden />
               <p className="text-[12px] md:text-[13px] leading-relaxed text-white/85 m-0" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>
                 {ARTICLE_DISCLAIMER}
               </p>
@@ -780,9 +789,9 @@ function ArticleView({
                         key={i}
                         onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
                         className="flex w-full items-start gap-2.5 text-left text-[13px] leading-snug py-2 px-2.5 rounded-lg transition-all hover:text-stone-900"
-                        style={on ? { color: '#171412', background: '#F3EFEA', fontWeight: 600 } : { color: inkSoft }}
+                        style={on ? { color: '#4C1D95', background: '#F5F3FF', fontWeight: 600 } : { color: inkSoft }}
                       >
-                        <span className="mt-[2px] text-[10px] font-semibold tabular-nums text-amber-800">
+                        <span className="mt-[2px] text-[10px] font-semibold tabular-nums text-purple-700">
                           {String(i + 1).padStart(2, '0')}
                         </span>
                         <span>{item.label}</span>
@@ -800,7 +809,7 @@ function ArticleView({
                     key={v}
                     onClick={() => setFontSize(v)}
                     className={`w-7 h-7 flex items-center justify-center font-semibold rounded-full transition-all ${sizes[v]}`}
-                    style={fontSize === v ? { background: ink, color: '#fff' } : { color: inkSoft }}
+                    style={fontSize === v ? { background: brandAccent, color: '#fff' } : { color: inkSoft }}
                     aria-label={`Размер текста: ${v}`}
                   >
                     А
@@ -828,8 +837,8 @@ function ArticleView({
           <article className="order-2 lg:col-start-2 lg:row-start-1 min-w-0 max-w-[860px]">
             {renderContent(article.content)}
 
-            <div className="mt-14 p-8 lg:p-10 rounded-3xl bg-stone-50 border border-stone-200">
-              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+            <div className="mt-14 p-8 lg:p-10 rounded-3xl bg-gradient-to-br from-purple-50 to-stone-50 border border-purple-200/70">
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                 Бесплатная консультация
               </div>
               <h3 className="text-stone-900 mb-3" style={{ fontFamily: displayFont, fontWeight: 400, fontSize: '28px' }}>
@@ -840,7 +849,7 @@ function ArticleView({
               </p>
               <button
                 onClick={() => document.getElementById('lead-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                className="inline-flex items-center gap-2 px-6 py-3.5 text-[12px] font-semibold uppercase tracking-[0.2em] text-white rounded-full transition-all bg-stone-900 hover:bg-stone-800 shadow-md"
+                className="inline-flex items-center gap-2 px-6 py-3.5 text-[12px] font-semibold uppercase tracking-[0.2em] text-white rounded-full transition-all bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 shadow-md shadow-purple-600/20 cursor-pointer"
               >
                 <Phone className="w-4 h-4" /> Задать вопрос юристу
               </button>
@@ -849,7 +858,7 @@ function ArticleView({
 
           <aside className={`order-3 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky ${STICKY_TOP} xl:h-fit space-y-6`}>
             <div id="lead-form" className="p-7 bg-white rounded-3xl border shadow-sm" style={{ borderColor: borderLine }}>
-              <div className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2 text-amber-800">
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2 text-purple-700">
                 Задать вопрос
               </div>
               <h4 className="text-base font-semibold text-stone-900 mb-2">Консультация риэлтера</h4>
@@ -859,11 +868,11 @@ function ArticleView({
               <ArticleLeadForm articleTitle={article.title} handleAddLead={handleAddLead} />
             </div>
 
-            <div className="p-6 rounded-3xl bg-amber-50/70 border border-amber-200">
-              <div className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2 text-amber-900">
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-purple-50 to-stone-100 border border-purple-200/70">
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2 text-purple-800">
                 АН Фаттория
               </div>
-              <p className="text-[12px] leading-relaxed text-amber-950">
+              <p className="text-[12px] leading-relaxed text-stone-700">
                 Государственная лицензия №02240/446. Страхование профессиональной ответственности. Регулируемая комиссия от 1.5% до 6%.
               </p>
             </div>
@@ -874,14 +883,14 @@ function ArticleView({
           <section className="max-w-[1400px] mx-auto px-6 lg:px-10 pt-12 pb-24 border-t" style={{ borderColor: borderLine }}>
             <div className="flex items-end justify-between mb-8 pb-4">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
+                <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-purple-700">
                   Продолжить чтение
                 </div>
                 <h2 style={{ fontFamily: displayFont, fontWeight: 400, fontSize: '30px', color: ink }}>
                   Читайте также
                 </h2>
               </div>
-              <button onClick={onBack} className="hidden sm:inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900 hover:text-amber-800">
+              <button onClick={onBack} className="hidden sm:inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-stone-900 hover:text-purple-700 cursor-pointer">
                 Все материалы <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -919,11 +928,11 @@ function ArticleLeadForm({ articleTitle, handleAddLead }: { articleTitle: string
 
   if (sent) {
     return (
-      <div className="text-center py-4 bg-amber-50 rounded-2xl p-4 border border-amber-200">
-        <CheckCircle className="w-7 h-7 mx-auto mb-2 text-amber-700" />
+      <div className="text-center py-4 bg-purple-50 rounded-2xl p-4 border border-purple-200">
+        <CheckCircle className="w-7 h-7 mx-auto mb-2 text-purple-600" />
         <p className="text-[14px] font-semibold text-stone-900">Заявка отправлена</p>
         <p className="text-[12px] text-stone-600 mt-1">Мы свяжемся с вами в течение 15 минут</p>
-        <button onClick={() => setSent(false)} className="text-[11px] underline mt-3 text-amber-800 font-medium">
+        <button onClick={() => setSent(false)} className="text-[11px] underline mt-3 text-purple-700 font-medium cursor-pointer">
           Отправить ещё
         </button>
       </div>
@@ -938,7 +947,7 @@ function ArticleLeadForm({ articleTitle, handleAddLead }: { articleTitle: string
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Ваше имя"
-        className="w-full px-4 py-3 rounded-xl border text-[14px] focus:outline-none focus:border-stone-500 transition-colors bg-stone-50 text-stone-900"
+        className="w-full px-4 py-3 rounded-xl border text-[14px] focus:outline-none focus:border-purple-500 transition-colors bg-stone-50 text-stone-900"
         style={{ borderColor: borderLine }}
       />
       <input
@@ -947,12 +956,12 @@ function ArticleLeadForm({ articleTitle, handleAddLead }: { articleTitle: string
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         placeholder="+375 (__) ___-__-__"
-        className="w-full px-4 py-3 rounded-xl border text-[14px] focus:outline-none focus:border-stone-500 transition-colors bg-stone-50 text-stone-900"
+        className="w-full px-4 py-3 rounded-xl border text-[14px] focus:outline-none focus:border-purple-500 transition-colors bg-stone-50 text-stone-900"
         style={{ borderColor: borderLine }}
       />
       <button
         type="submit"
-        className="w-full py-3.5 mt-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white rounded-xl transition-all bg-stone-900 hover:bg-stone-800 shadow-md cursor-pointer"
+        className="w-full py-3.5 mt-2 text-[11px] font-semibold uppercase tracking-[0.25em] text-white rounded-xl transition-all bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 shadow-md shadow-purple-600/20 cursor-pointer"
       >
         Отправить заявку
       </button>

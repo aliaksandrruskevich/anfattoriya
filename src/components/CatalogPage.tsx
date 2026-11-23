@@ -40,7 +40,7 @@ function useFonts() {
 
 function Reveal({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
   
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 150 + delay);
@@ -146,7 +146,7 @@ export default function CatalogPage({
             </div>
             
             <h1 className="text-white leading-[1.05]" style={{ fontFamily: displayFont, fontWeight: 400, fontSize: 'clamp(34px, 6vw, 60px)' }}>
-              {totalListings}+ проверенных<br />объектов в базе
+              {totalListings > 0 ? `${totalListings} проверенных` : 'Проверенные'}<br />объектов в каталоге
             </h1>
             
             <p className="text-white/70 mt-5 max-w-xl" style={{ fontWeight: 300, fontSize: 'clamp(16px, 2vw, 21px)', lineHeight: 1.5 }}>
@@ -178,7 +178,7 @@ export default function CatalogPage({
 
             <div className="flex flex-wrap gap-x-10 gap-y-6 mt-12">
               {[
-                { value: `${totalListings}`, label: 'объектов в базе' },
+                { value: `${totalListings}`, label: 'объектов в каталоге' },
                 { value: '100%', label: 'проверенных' },
                 { value: '24ч', label: 'подбор под ключ' },
               ].map((item, i) => (

@@ -45,6 +45,8 @@ import MyDraftPropertiesTab from './MyDraftPropertiesTab';
 import RealtQuickImporterModal from './RealtQuickImporterModal';
 import { PublishSellerPropertyModal } from './PublishSellerPropertyModal';
 import { SmartDayPlannerWidget } from './SmartDayPlannerWidget';
+import KufarChatsWorkspace from './KufarChatsWorkspace';
+import { sanitizeRichHtml } from '../lib/sanitize';
 
 const downloadCSV = (filename: string, headers: string[], rows: string[][]) => {
   const escapeField = (field: any) => {
@@ -71,6 +73,7 @@ const downloadCSV = (filename: string, headers: string[], rows: string[][]) => {
 interface AgentCabinetPageProps {
   loggedInAgent: Agent | null;
   setLoggedInAgent: (agent: Agent | null) => void;
+  onLogout?: () => Promise<void>;
   agentsList: Agent[];
   setAgentsList: (list: Agent[]) => void;
   propertiesList: Property[];
@@ -81,6 +84,10 @@ interface AgentCabinetPageProps {
   handleClearLeads: () => void;
   buyersList: Buyer[];
   setBuyersList: (list: Buyer[]) => void;
+  sellersList?: ColdSeller[];
+  setSellersList?: (list: ColdSeller[]) => void;
+  tasksList?: CRMTask[];
+  setTasksList?: (list: CRMTask[]) => void;
   articlesList: Article[];
   setArticlesList: (list: Article[]) => void;
   syncWithRealt: () => Promise<void>;
@@ -92,6 +99,7 @@ interface AgentCabinetPageProps {
 export default function AgentCabinetPage({
   loggedInAgent,
   setLoggedInAgent,
+  onLogout,
   agentsList,
   setAgentsList,
   propertiesList,
@@ -102,6 +110,10 @@ export default function AgentCabinetPage({
   handleClearLeads,
   buyersList,
   setBuyersList,
+  sellersList: propSellersList,
+  setSellersList: propSetSellersList,
+  tasksList: propTasksList,
+  setTasksList: propSetTasksList,
   articlesList,
   setArticlesList,
   syncWithRealt,
@@ -110,12 +122,26 @@ export default function AgentCabinetPage({
   onSelectProperty,
   loadCabinetData
 }: AgentCabinetPageProps) {
-  // Загружаем данные кабинета (лиды, покупатели, продавцы, задачи)
+  const [newChatsCount, setNewChatsCount] = useState<number>(0);
+
+  // Загружаем данные кабинета (лиды, покупатели, продавцы, задачи) только после авторизации
   useEffect(() => {
-    if (loadCabinetData) {
+    if (loggedInAgent?.id && loadCabinetData) {
       loadCabinetData();
     }
-  }, [loadCabinetData]);
+  }, [loggedInAgent?.id, loadCabinetData]);
+
+  useEffect(() => {
+    if (!loggedInAgent) return;
+    fetch('/api/chats')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setNewChatsCount(data.filter((c: any) => c.status === 'new').length);
+        }
+      })
+      .catch(() => {});
+  }, [loggedInAgent]);
 
   // Permission helpers according to strict RBAC specifications:
   // Roles: 1) Administrator, 2) Call-Center, 3) Realtor
@@ -214,6 +240,7 @@ export default function AgentCabinetPage({
   const [loginType, setLoginType] = useState<'agent' | 'callcenter' | 'admin'>('agent');
   const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Registration states
   const [regName, setRegName] = useState('');
@@ -225,10 +252,7 @@ export default function AgentCabinetPage({
 
   // SMS Template System
   const [smsTemplates, setSmsTemplates] = useState<{id: string, label: string, text: string}[]>(() => {
-    if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('fp_sms_templates');
-    if (saved) return JSON.parse(saved);
-    return [
+    const defaults = [
       { 
         id: 'welcome', 
         label: 'Приветствие', 
@@ -250,11 +274,22 @@ export default function AgentCabinetPage({
         text: 'Напоминаем о просмотре объекта "{object}". Ждем вашего подтверждения. {agent}.' 
       }
     ];
+    if (typeof window === 'undefined') return defaults;
+    try {
+      const saved = localStorage.getItem('fp_sms_templates');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return defaults;
   });
 
   const saveSmsTemplates = (updated: typeof smsTemplates) => {
     setSmsTemplates(updated);
-    localStorage.setItem('fp_sms_templates', JSON.stringify(updated));
+    try {
+      localStorage.setItem('fp_sms_templates', JSON.stringify(updated));
+    } catch {}
   };
 
   const [smsModal, setSmsModal] = useState<{
@@ -265,23 +300,37 @@ export default function AgentCabinetPage({
   }>({ isOpen: false, phone: '', clientName: '', objectInfo: '' });
 
   const handleSmsRequest = (phone: string, text: string) => {
-    alert(`[СИМУЛЯЦИЯ SMS/VIBER]\nОтправка сообщения на: ${phone}\n\nТекст: "${text}"\n\nСтатус: Отправлено успешно!`);
+    setAssignmentNotification(`SMS/Viber шаблон подготовлен для ${phone}`);
+    setTimeout(() => setAssignmentNotification(null), 4000);
     setSmsModal({ ...smsModal, isOpen: false });
   };
 
-  // Tasks state
-  const [tasksList, setTasksList] = useState<CRMTask[]>(() => {
+  // Tasks state (синхронизируется с сервером через Providers при передаче пропсов)
+  const [localTasksList, setLocalTasksList] = useState<CRMTask[]>(() => {
     if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('fp_tasks');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('fp_tasks');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
 
+  const tasksList = propTasksList !== undefined ? propTasksList : localTasksList;
+
   const saveTasks = (tasks: CRMTask[]) => {
-    setTasksList(tasks);
-    localStorage.setItem('fp_tasks', JSON.stringify(tasks));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('fp_tasks_updated'));
+    if (propSetTasksList) {
+      propSetTasksList(tasks);
+    } else {
+      setLocalTasksList(tasks);
     }
+    try {
+      localStorage.setItem('fp_tasks', JSON.stringify(tasks));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('fp_tasks_updated'));
+      }
+    } catch {}
   };
 
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -294,10 +343,7 @@ export default function AgentCabinetPage({
   const [isAddingBuyer, setIsAddingBuyer] = useState(false);
 
   const [telegramTemplates, setTelegramTemplates] = useState<{id: string, label: string, text: string}[]>(() => {
-    if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('fp_tg_templates');
-    if (saved) return JSON.parse(saved);
-    return [
+    const defaults = [
       { 
         id: 'hot_offer', 
         label: 'Горячий объект 🔥', 
@@ -314,6 +360,15 @@ export default function AgentCabinetPage({
         text: 'Уважаемый {name}, сообщаем вам об изменениях на рынке недвижимости Минска. Проверьте нашу новую подборку статей: {link}. АН Фаттория.' 
       }
     ];
+    if (typeof window === 'undefined') return defaults;
+    try {
+      const saved = localStorage.getItem('fp_tg_templates');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return defaults;
   });
 
   const [selectedTgTemplateId, setSelectedTgTemplateId] = useState('hot_offer');
@@ -334,30 +389,32 @@ export default function AgentCabinetPage({
   };
 
   // Active workspace tab
-  const [cabinetTab, setCabinetTab] = useState<'profile' | 'leads' | 'leads_kanban' | 'analytics' | 'calendar' | 'sellers' | 'listings' | 'employees' | 'parsing' | 'buyers' | 'articles' | 'sms_templates' | 'tasks' | 'callcenter' | 'requests_registry'>(() => {
+  const [cabinetTab, setCabinetTab] = useState<'profile' | 'leads' | 'leads_kanban' | 'analytics' | 'calendar' | 'sellers' | 'listings' | 'employees' | 'parsing' | 'buyers' | 'articles' | 'sms_templates' | 'tasks' | 'callcenter' | 'requests_registry' | 'chats'>(() => {
     if (typeof window === 'undefined') return 'profile';
-    const saved = localStorage.getItem('fp_logged_agent');
-    if (saved) {
-      const logged = JSON.parse(saved);
-      const isLoggedAdmin = logged && (logged.id === 'admin' || logged.isAdmin === true || logged.name === 'Администратор системы');
-      const isLoggedManager = logged && (logged.role?.toLowerCase().includes('менеджер') || logged.role?.toLowerCase().includes('manager'));
-      const isLoggedCallCenter = logged && (logged.role?.toLowerCase().includes('колцентр') || logged.role?.toLowerCase().includes('call center'));
-      
-      const savedTab = localStorage.getItem('fp_active_tab');
-      if (savedTab) return savedTab as any;
+    try {
+      const saved = localStorage.getItem('fp_logged_agent');
+      if (saved) {
+        const logged = JSON.parse(saved);
+        const isLoggedAdmin = logged && (logged.id === 'admin' || logged.isAdmin === true || logged.name === 'Администратор системы');
+        const isLoggedManager = logged && (logged.role?.toLowerCase().includes('менеджер') || logged.role?.toLowerCase().includes('manager'));
+        const isLoggedCallCenter = logged && (logged.role?.toLowerCase().includes('колцентр') || logged.role?.toLowerCase().includes('call center'));
+        
+        const savedTab = localStorage.getItem('fp_active_tab');
+        if (savedTab) return savedTab as any;
 
-      return (isLoggedAdmin || isLoggedManager || isLoggedCallCenter) ? 'profile' : 'buyers';
-    }
+        return (isLoggedAdmin || isLoggedManager || isLoggedCallCenter) ? 'profile' : 'listings';
+      }
+    } catch {}
     return 'profile';
   });
 
-  const isAllowedForRealtor = cabinetTab === 'profile' || cabinetTab === 'buyers' || cabinetTab === 'tasks' || cabinetTab === 'sellers' || cabinetTab === 'listings' || cabinetTab === 'sms_templates';
+  const isAllowedForRealtor = cabinetTab === 'profile' || cabinetTab === 'buyers' || cabinetTab === 'tasks' || cabinetTab === 'sellers' || cabinetTab === 'listings' || cabinetTab === 'sms_templates' || cabinetTab === 'chats';
   const isAllowedForCallCenter = cabinetTab !== 'employees';
   const activeTab = isAgentAdmin 
     ? cabinetTab 
     : isAgentCallCenter 
       ? (isAllowedForCallCenter ? cabinetTab : 'sellers')
-      : (isAllowedForRealtor ? cabinetTab : 'buyers');
+      : (isAllowedForRealtor ? cabinetTab : 'listings');
 
   const [sellerViewMode, setSellerViewMode] = useState<'kanban' | 'table'>('kanban');
 
@@ -397,8 +454,13 @@ export default function AgentCabinetPage({
   const [institutionalRequests, setInstitutionalRequests] = useState<InstitutionalRequest[]>([]);
 
   React.useEffect(() => {
-    const saved = localStorage.getItem('fp_institutional_requests');
-    if (saved) setInstitutionalRequests(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem('fp_institutional_requests');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setInstitutionalRequests(parsed);
+      }
+    } catch {}
   }, [showInstitutionalRequestsModal]);
 
   const myAgentPropertiesCount = React.useMemo(() => {
@@ -479,7 +541,7 @@ export default function AgentCabinetPage({
     setEditEmpRole(agent.role || 'Риэлтер');
     setEditEmpPhone(agent.phone || '+375 ');
     setEditEmpEmail(agent.email || '');
-    setEditEmpPassword(agent.password || '');
+    setEditEmpPassword('');
 
     // Parse experience
     const exp = agent.experience || '';
@@ -578,21 +640,23 @@ const handleSaveEditEmployee = async () => {
       return;
     }
 
-    const updated = agentsList.map((a: Agent) => {
-      if (a.id === editingAgent.id) {
-        return {
-          ...a,
-          ...payload,
-          password: undefined, // не храним пароль в браузере
-        };
-      }
-      return a;
-    });
+    const data = await res.json().catch(() => ({}));
+    const savedAgent: Agent | undefined = data?.agent;
 
-    setAgentsList(updated);
+    if (loadCabinetData) {
+      await loadCabinetData();
+    } else {
+      const updated = agentsList.map((a: Agent) => {
+        if (a.id === editingAgent.id) {
+          return savedAgent || { ...a, ...payload, password: '' };
+        }
+        return a;
+      });
+      setAgentsList(updated);
+    }
 
     if (loggedInAgent && loggedInAgent.id === editingAgent.id) {
-      const updatedLoggedIn = {
+      const updatedLoggedIn = savedAgent || {
         ...loggedInAgent,
         name: editEmpName.trim(),
         role: editEmpRole.trim(),
@@ -606,7 +670,8 @@ const handleSaveEditEmployee = async () => {
     }
 
     setEditingAgent(null);
-    alert(`Данные сотрудника ${editEmpName.trim()} успешно сохранены в CRM!`);
+    setAssignmentNotification(`Данные сотрудника ${editEmpName.trim()} успешно сохранены в CRM!`);
+    setTimeout(() => setAssignmentNotification(null), 5000);
   } catch (error: any) {
     alert('Ошибка сети при сохранении: ' + error.message);
   }
@@ -835,8 +900,8 @@ const handleSaveEditEmployee = async () => {
   const [editBuyerAssignedAgent, setEditBuyerAssignedAgent] = useState<string>('');
   const [expandedMatchBuyerId, setExpandedMatchBuyerId] = useState<string | null>(null);
 
-  // Cold Sellers Database states
-  const [sellersList, setSellersList] = useState<ColdSeller[]>(() => {
+  // Cold Sellers Database states (синхронизируется с сервером через Providers при передаче пропсов)
+  const [localSellersList, setLocalSellersList] = useState<ColdSeller[]>(() => {
     if (typeof window === 'undefined') return [];
     const saved = localStorage.getItem('fp_cold_sellers') || localStorage.getItem('fp_sellers');
     if (saved) {
@@ -931,10 +996,22 @@ const handleSaveEditEmployee = async () => {
     ];
   });
 
+  const sellersList = propSellersList !== undefined ? propSellersList : localSellersList;
+  const setSellersList = (next: ColdSeller[]) => {
+    if (propSetSellersList) {
+      propSetSellersList(next);
+    } else {
+      setLocalSellersList(next);
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem('fp_cold_sellers', JSON.stringify(sellersList));
-    localStorage.setItem('fp_sellers', JSON.stringify(sellersList));
-  }, [sellersList]);
+    if (propSellersList !== undefined) return;
+    try {
+      localStorage.setItem('fp_cold_sellers', JSON.stringify(localSellersList));
+      localStorage.setItem('fp_sellers', JSON.stringify(localSellersList));
+    } catch {}
+  }, [localSellersList, propSellersList]);
 
   // Delayed Seller Realtor Assignment Handler
   const handleAssignSellerAgent = (sellerId: string, agentName: string) => {
@@ -1349,8 +1426,12 @@ const handleSaveEditEmployee = async () => {
           sellersList={sellersList}
           nbrbRate={nbrbRate}
           onLogout={() => {
-            setLoggedInAgent(null);
-            localStorage.removeItem('fp_logged_agent');
+            if (onLogout) {
+              void onLogout();
+            } else {
+              setLoggedInAgent(null);
+              localStorage.removeItem('fp_logged_agent');
+            }
           }}
           onViewProperty={(property) => {
             if (onSelectProperty) {
@@ -1547,18 +1628,24 @@ const handleSaveEditEmployee = async () => {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-stone-100">
+              <div className="pt-6 border-t border-stone-100 space-y-3">
+                {loginError && (
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                    {loginError}
+                  </div>
+                )}
   <button
     onClick={async () => {
+      setLoginError(null);
       const trimmedName = loginName.trim();
       const trimmedPass = loginPassword.trim();
 
       if (!trimmedName) {
-        alert("Пожалуйста, введите Email/логин!");
+        setLoginError("Пожалуйста, введите Email/логин!");
         return;
       }
       if (!trimmedPass) {
-        alert("Пожалуйста, введите пароль для входа!");
+        setLoginError("Пожалуйста, введите пароль для входа!");
         return;
       }
 
@@ -1570,16 +1657,14 @@ const handleSaveEditEmployee = async () => {
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(data.error || 'Неверный email или пароль');
+          setLoginError(data.error || 'Неверный email или пароль');
           return;
         }
         setLoggedInAgent(data.agent);
-        localStorage.setItem('fp_logged_agent', JSON.stringify(data.agent));
-        alert(`Добро пожаловать, ${data.agent.name}!`);
         if (data.agent.isAdmin) setCabinetTab('leads');
         else setCabinetTab('sellers');
       } catch (e: any) {
-        alert('Ошибка входа: ' + (e.message || 'неизвестная'));
+        setLoginError('Ошибка входа: ' + (e.message || 'неизвестная'));
       }
     }}
     className="w-full py-4 bg-neutral-900 hover:bg-purple-500 hover:text-neutral-950 text-white uppercase text-xs font-black tracking-widest rounded-xl transition-all cursor-pointer outline-none shadow-md hover:shadow-lg active:scale-[0.98]"
@@ -1677,7 +1762,7 @@ const handleSaveEditEmployee = async () => {
                   >
                     <span className="flex items-center gap-2.5 truncate min-w-0">
                       <Layers className="w-4 h-4 shrink-0" />
-                      <span className="truncate">Мои объекты (Закрытая база)</span>
+                      <span className="truncate">Мои объекты (Черновики)</span>
                     </span>
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-md font-mono shrink-0 ${cabinetTab === 'listings' ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 border border-stone-200'}`}>
                       {myAgentPropertiesCount}
@@ -1702,21 +1787,46 @@ const handleSaveEditEmployee = async () => {
                   </button>
 
                   <button
-                    onClick={() => setCabinetTab('buyers')}
+                    onClick={() => setCabinetTab('chats')}
                     className={`w-full px-3.5 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer outline-none ${
-                      cabinetTab === 'buyers' 
+                      cabinetTab === 'chats' 
                         ? 'bg-[#8B5CF6] text-white shadow-md shadow-purple-200' 
                         : 'text-stone-700 hover:bg-stone-100 hover:text-stone-900'
                     }`}
                   >
                     <span className="flex items-center gap-2.5 truncate min-w-0">
-                      <Users className="w-4 h-4 shrink-0" />
-                      <span className="truncate">База покупателей</span>
+                      <MessageCircle className="w-4 h-4 shrink-0 text-purple-600" />
+                      <span className="truncate">Чаты (Kufar)</span>
                     </span>
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md font-mono shrink-0 ${cabinetTab === 'buyers' ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 border border-stone-200'}`}>
-                      {buyersList.length}
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-md font-mono shrink-0 ${
+                      cabinetTab === 'chats'
+                        ? 'bg-stone-900 text-white'
+                        : newChatsCount > 0
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-stone-100 text-stone-700 border border-stone-200'
+                    }`}>
+                      {newChatsCount > 0 ? `+${newChatsCount}` : 'Kufar'}
                     </span>
                   </button>
+
+                  {hasFullAccess && (
+                    <button
+                      onClick={() => setCabinetTab('buyers')}
+                      className={`w-full px-3.5 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer outline-none ${
+                        cabinetTab === 'buyers' 
+                          ? 'bg-[#8B5CF6] text-white shadow-md shadow-purple-200' 
+                          : 'text-stone-700 hover:bg-stone-100 hover:text-stone-900'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5 truncate min-w-0">
+                        <Users className="w-4 h-4 shrink-0" />
+                        <span className="truncate">База покупателей</span>
+                      </span>
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md font-mono shrink-0 ${cabinetTab === 'buyers' ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 border border-stone-200'}`}>
+                        {buyersList.length}
+                      </span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setCabinetTab('tasks')}
@@ -1922,9 +2032,12 @@ const handleSaveEditEmployee = async () => {
                 <div className="pt-6 border-t border-neutral-800">
                   <button
                     onClick={() => {
-                      setLoggedInAgent(null);
-                      localStorage.removeItem('fp_logged_agent');
-                      alert("Вы успешно вышли из личного кабинета.");
+                      if (onLogout) {
+                        void onLogout();
+                      } else {
+                        setLoggedInAgent(null);
+                        localStorage.removeItem('fp_logged_agent');
+                      }
                     }}
                     className="w-full px-4 py-2.5 bg-neutral-800 hover:bg-rose-600 hover:text-white text-rose-400 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer outline-none"
                   >
@@ -1939,9 +2052,12 @@ const handleSaveEditEmployee = async () => {
                   <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Раздел кабинета</span>
                   <button
                     onClick={() => {
-                      setLoggedInAgent(null);
-                      localStorage.removeItem('fp_logged_agent');
-                      alert("Вы успешно вышли из личного кабинета.");
+                      if (onLogout) {
+                        void onLogout();
+                      } else {
+                        setLoggedInAgent(null);
+                        localStorage.removeItem('fp_logged_agent');
+                      }
                     }}
                     className="px-2 py-1 bg-rose-600/15 hover:bg-rose-600 text-rose-400 hover:text-white rounded text-[10px] font-black uppercase tracking-wider transition-all"
                   >
@@ -1957,7 +2073,8 @@ const handleSaveEditEmployee = async () => {
                   <optgroup label="Разделы CRM">
                     <option value="listings">🏢 Мои объекты ({propertiesList.length})</option>
                     <option value="sellers">📞 База продавцов ({sellersList.length})</option>
-                    <option value="buyers">👥 База покупателей ({buyersList.length})</option>
+                    <option value="chats">💬 Чаты Kufar ({newChatsCount})</option>
+                    {hasFullAccess && <option value="buyers">👥 База покупателей ({buyersList.length})</option>}
                     <option value="tasks">📋 Мои Задачи ({tasksList.filter(t => t.status === 'pending').length})</option>
                     <option value="callcenter">🎧 Колл-Центр оператора</option>
                   </optgroup>
@@ -2003,6 +2120,7 @@ const handleSaveEditEmployee = async () => {
                         {cabinetTab === 'leads' && '💼 Сводный реестр заявок и лидов'}
                         {cabinetTab === 'sellers' && '📞 База продавцов и контактов'}
                         {cabinetTab === 'listings' && '🏷️ База объектов недвижимости'}
+                        {cabinetTab === 'chats' && '💬 Чаты с клиентами (Kufar)'}
                         {cabinetTab === 'buyers' && '💎 База инвесторов и покупателей'}
                         {cabinetTab === 'tasks' && '📋 Задачи и планер риэлтера'}
                         {cabinetTab === 'parsing' && '⚡ ИИ-Парсинг объявлений & Колл-центр'}
@@ -2222,17 +2340,32 @@ const handleSaveEditEmployee = async () => {
 
                     <div className="pt-2 flex justify-end">
                       <button
-                        onClick={() => {
-                          if (loggedInAgent) {
-                            const idx = agentsList.findIndex((a: Agent) => a.id === loggedInAgent.id);
-                            let updatedList = [...agentsList];
-                            if (idx !== -1) {
-                              updatedList[idx] = loggedInAgent;
-                            } else {
-                              updatedList.push(loggedInAgent);
+                        onClick={async () => {
+                          if (!loggedInAgent) return;
+                          try {
+                            const res = await fetch(`/api/agents/${encodeURIComponent(loggedInAgent.id)}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                name: loggedInAgent.name,
+                                role: loggedInAgent.role,
+                                phone: loggedInAgent.phone,
+                                experience: loggedInAgent.experience,
+                                dealsCount: loggedInAgent.dealsCount,
+                                photo: loggedInAgent.photo,
+                              }),
+                            });
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              setAssignmentNotification(data?.error || 'Не удалось сохранить изменения профиля');
+                              return;
                             }
-                            setAgentsList(updatedList);
-                            alert("Ваша визитная карточка на сайте успешно синхронизирована и обновлена!");
+                            if (data?.agent) setLoggedInAgent(data.agent);
+                            if (loadCabinetData) await loadCabinetData();
+                            setAssignmentNotification('Ваша визитная карточка на сайте успешно синхронизирована и обновлена!');
+                            setTimeout(() => setAssignmentNotification(null), 5000);
+                          } catch {
+                            setAssignmentNotification('Ошибка сети при сохранении профиля');
                           }
                         }}
                         className="px-5 py-2.5 bg-neutral-900 hover:bg-purple-500 hover:text-black font-extrabold text-xs text-white uppercase tracking-wider rounded-lg transition-all cursor-pointer outline-none"
@@ -4631,9 +4764,9 @@ const handleSaveEditEmployee = async () => {
                                             </span>
                                           </div>
                                           <div className="flex justify-between items-center">
-                                            <span className="text-stone-400">Пароль CRM:</span>
-                                            <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200/50">
-                                              {agent.password || '123456'}
+                                            <span className="text-stone-400">Статус CRM:</span>
+                                            <span className={`font-bold px-1.5 py-0.5 rounded border ${isDismissed ? 'text-rose-700 bg-rose-50 border-rose-200/50' : 'text-emerald-700 bg-emerald-50 border-emerald-200/50'}`}>
+                                              {isDismissed ? 'Доступ закрыт' : agent.isAdmin ? 'Администратор' : 'Доступ активен'}
                                             </span>
                                           </div>
                                         </div>
@@ -4738,6 +4871,23 @@ const handleSaveEditEmployee = async () => {
                   </div>
                 );
               })()}
+
+              {/* TAB CONTENTS: KUFAR CHATS WORKSPACE */}
+              {activeTab === 'chats' && (
+                <KufarChatsWorkspace
+                  loggedInAgent={loggedInAgent}
+                  propertiesList={propertiesList}
+                  buyersList={buyersList}
+                  onCreateBuyer={(newBuyer) => {
+                    const updated = [newBuyer, ...buyersList];
+                    return setBuyersList(updated);
+                  }}
+                  onCreateLead={(name, phone, typeOrPrice, formName) => {
+                    handleAddLead(name, phone, typeOrPrice, formName);
+                  }}
+                  onChatsCountChange={setNewChatsCount}
+                />
+              )}
 
               {/* TAB CONTENTS: CALL CENTER WORKSPACE */}
               {activeTab === 'callcenter' && (
@@ -5828,7 +5978,7 @@ const handleSaveEditEmployee = async () => {
                                                   ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300"
                                                   : "bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300"
                                               }`}
-                                              title={buyer.isPublicApproved ? "Отображается на сайте в Базе покупателей (кликните, чтобы скрыть в закрытую CRM)" : "Только внутри CRM (кликните, чтобы опубликовать на сайте)"}
+                                              title={buyer.isPublicApproved ? "Отображается на сайте в списке запросов (кликните, чтобы скрыть во внутреннюю CRM)" : "Только внутри CRM (кликните, чтобы опубликовать на сайте)"}
                                             >
                                               {buyer.isPublicApproved ? "🌐 На сайте" : "🔒 Только в CRM"}
                                             </button>
@@ -6238,7 +6388,7 @@ const handleSaveEditEmployee = async () => {
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {tasksList
+                          {[...tasksList]
                             .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
                             .map((task) => {
                               const isOverdue = task.status === 'pending' && new Date(task.deadline) < new Date();
@@ -6936,7 +7086,7 @@ const handleSaveEditEmployee = async () => {
                               ol: ({ children }) => <ol className="my-3 space-y-1 pl-5 list-decimal marker:text-amber-800 font-semibold">{children}</ol>,
                             }}
                           >
-                            {newArticleContent || "*Текст статьи пока пуст. Переключитесь на вкладку «Редактор», чтобы наполнить статью содержанием.*"}
+                            {sanitizeRichHtml(newArticleContent || "*Текст статьи пока пуст. Переключитесь на вкладку «Редактор», чтобы наполнить статью содержанием.*")}
                           </ReactMarkdown>
                         </div>
                       </div>

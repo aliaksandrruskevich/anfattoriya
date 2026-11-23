@@ -36,7 +36,7 @@ export default function ServicesPage({ activePage, navigateTo, handleAddLead }: 
               style={{ borderRight: '1px dashed #737373', borderBottom: '1px dashed #737373' }}>
               <span className="text-5xl font-thin text-stone-500 mb-4">01.</span>
               <h3 className="text-white font-bold text-sm mb-3 uppercase tracking-wide" style={{ fontFamily: 'Raleway, sans-serif' }}>Профессиональная оценка</h3>
-              <p className="text-stone-400 text-xs leading-relaxed" style={{ fontFamily: 'Raleway, sans-serif', lineHeight: 1.6 }}>Мы проведем профессиональную оценку и предоставим максимально выгодный для Вас анализ для продажи и сдачи в аренду с использованием нашей специализированной базы данных.</p>
+              <p className="text-stone-400 text-xs leading-relaxed" style={{ fontFamily: 'Raleway, sans-serif', lineHeight: 1.6 }}>Мы проведем профессиональную оценку и предоставим максимально выгодный для Вас анализ для продажи и сдачи в аренду на основе данных о реальных сделках НКА и БРТИ.</p>
             </div>
             <div className="border border-dashed border-neutral-500 p-6 lg:p-8 flex flex-col min-h-[320px]"
               style={{ borderLeft: 'none', borderRight: '1px dashed #737373', borderBottom: '1px dashed #737373' }}>
@@ -74,7 +74,7 @@ export default function ServicesPage({ activePage, navigateTo, handleAddLead }: 
               style={{ borderLeft: 'none', borderTop: 'none' }}>
               <span className="text-5xl font-thin text-stone-500 mb-4">06.</span>
               <h3 className="text-white font-bold text-sm mb-3 uppercase tracking-wide" style={{ fontFamily: 'Raleway, sans-serif' }}>Поиск и проверка клиентов</h3>
-              <p className="text-stone-400 text-xs leading-relaxed" style={{ fontFamily: 'Raleway, sans-serif', lineHeight: 1.6 }}>Поиск в нашей базе покупателей и арендаторов. Проверка благонадежности контрагентов для Вашего спокойствия.</p>
+              <p className="text-stone-400 text-xs leading-relaxed" style={{ fontFamily: 'Raleway, sans-serif', lineHeight: 1.6 }}>Подбор заинтересованных покупателей и арендаторов по актуальным заявкам. Проверка благонадежности контрагентов для Вашего спокойствия.</p>
             </div>
           </div>
 
