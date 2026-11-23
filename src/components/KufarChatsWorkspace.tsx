@@ -87,6 +87,12 @@ export default function KufarChatsWorkspace({
   const [statusFilter, setStatusFilter] = useState<'all' | 'new'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [createdLeadChatIds, setCreatedLeadChatIds] = useState<Record<string, boolean>>({});
+  const [kufarStatus, setKufarStatus] = useState<{
+    configured: boolean;
+    loginMasked: string | null;
+    cookiesSaved: boolean;
+  } | null>(null);
+  const [syncingKufar, setSyncingKufar] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -134,9 +140,44 @@ export default function KufarChatsWorkspace({
     }
   }, []);
 
+  const fetchKufarStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/chats/status', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setKufarStatus(data);
+      }
+    } catch {
+      // ignore status check error
+    }
+  }, []);
+
+  const handleSyncFromKufar = async () => {
+    if (syncingKufar) return;
+    setSyncingKufar(true);
+    try {
+      const res = await fetch('/api/chats/fetch', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.ok) {
+        showToast(data.message || 'Чаты с Kufar синхронизированы');
+        await fetchChats();
+        await fetchKufarStatus();
+      } else if (data?.needsWorker) {
+        showToast(data.message || 'Запустите фоновый парсер Kufar на сервере');
+      } else {
+        showToast(data?.error || 'Не удалось синхронизировать с Kufar');
+      }
+    } catch {
+      showToast('Ошибка сети при синхронизации с Kufar');
+    } finally {
+      setSyncingKufar(false);
+    }
+  };
+
   useEffect(() => {
     fetchChats();
-  }, [fetchChats]);
+    fetchKufarStatus();
+  }, [fetchChats, fetchKufarStatus]);
 
   useEffect(() => {
     if (selectedChatId) {
@@ -396,16 +437,50 @@ export default function KufarChatsWorkspace({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={fetchChats}
-                disabled={loadingChats}
-                className="p-2 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-600 transition-colors cursor-pointer"
-                title="Обновить список чатов"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingChats ? 'animate-spin' : ''}`} />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {kufarStatus?.configured && (
+                  <button
+                    type="button"
+                    onClick={handleSyncFromKufar}
+                    disabled={syncingKufar}
+                    className="px-2.5 py-1.5 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-60"
+                    title="Войти на Kufar по логину/паролю из .env и загрузить новые сообщения"
+                  >
+                    {syncingKufar ? 'Синхронизация...' : 'Синхр. Kufar'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={fetchChats}
+                  disabled={loadingChats}
+                  className="p-2 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-600 transition-colors cursor-pointer"
+                  title="Обновить список чатов"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingChats ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
             </div>
+
+            {kufarStatus && (
+              <div
+                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold flex items-center justify-between gap-2 border ${
+                  kufarStatus.configured
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}
+              >
+                <span className="truncate">
+                  {kufarStatus.configured
+                    ? `Kufar (.env): ${kufarStatus.loginMasked}`
+                    : 'Kufar (.env): добавьте KUFAR_LOGIN и KUFAR_PASSWORD'}
+                </span>
+                {kufarStatus.cookiesSaved && (
+                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
+                    Сессия
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />

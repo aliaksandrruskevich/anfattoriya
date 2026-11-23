@@ -10,6 +10,8 @@ build/
 .env
 .env.*
 !.env.example
+kufar-cookies.json
+scripts/.kufar-sync-state.json
 
 # Бэкапы и дампы (ВАЖНО!)
 *.bak
