@@ -53,6 +53,7 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
   const [isEditingCriteria, setIsEditingCriteria] = useState(false);
   const [selectedPropertyForKP, setSelectedPropertyForKP] = useState<Property | null>(null);
   const [digestSuccess, setDigestSuccess] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(12);
 
   // Default criteria derived from buyer preferences or existing criteria
   const [criteria, setCriteria] = useState<BuyerSearchCriteria>(() => {
@@ -133,6 +134,7 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
     }
     setAutoNotify(activeBuyer.autoMatchingEnabled ?? true);
     setNotifyChannel(activeBuyer.notifyChannel || 'telegram');
+    setVisibleCount(12);
   }, [activeBuyer.id, activeBuyer.preferences, activeBuyer.budgetBYN, activeBuyer.budgetUSD]);
 
   const handleSaveCriteria = () => {
@@ -304,13 +306,15 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
     return text;
   };
 
-  const handleShareMessenger = (channel: 'telegram' | 'whatsapp') => {
+  const handleShareMessenger = (channel: 'telegram' | 'whatsapp' | 'viber') => {
     const text = getDigestShareText();
     const cleanPhone = activeBuyer.phone.replace(/[^\d]/g, '');
     if (channel === 'whatsapp') {
-      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    } else if (channel === 'viber') {
+      window.open(`viber://forward?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     } else {
-      window.open(`https://t.me/share/url?url=${encodeURIComponent('https://fattoriaminsk')}&text=${encodeURIComponent(text)}`, '_blank');
+      window.open(`https://t.me/share/url?url=${encodeURIComponent('https://fattoria.by/catalog')}&text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     }
     setDigestSuccess(`Подборка из ${matchedItems.length} объектов подготовлена для отправки в ${channel.toUpperCase()}!`);
     setTimeout(() => setDigestSuccess(null), 4000);
@@ -641,7 +645,15 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
           </div>
 
           {matchedItems.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleShareMessenger('viber')}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[10px] uppercase rounded-xl transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                title="Отправить подборку клиенту в Viber"
+              >
+                <span>Viber</span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleShareMessenger('telegram')}
@@ -678,8 +690,9 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
             <p className="text-[10px] text-stone-500">Попробуйте расширить рамки бюджета или района в настройках фильтра</p>
           </div>
         ) : (
+          <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {matchedItems.map(({ property, matchPercent, matchReasons }) => (
+            {matchedItems.slice(0, visibleCount).map(({ property, matchPercent, matchReasons }) => (
               <div
                 key={property.id}
                 className="bg-white border border-stone-200 hover:border-purple-500 rounded-2xl p-3.5 shadow-xs hover:shadow-md transition-all space-y-3 flex flex-col justify-between"
@@ -688,9 +701,13 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <img
-                        src={property.photo}
+                        src={property.photo || '/photo/hero-apartment.jpg'}
                         alt={property.title}
-                        className="w-16 h-16 rounded-xl object-cover shrink-0 border border-stone-200"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = '/photo/hero-apartment.jpg';
+                        }}
+                        className="w-16 h-16 rounded-xl object-cover shrink-0 border border-stone-200 bg-stone-100"
                       />
                       <div>
                         <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">
@@ -744,6 +761,21 @@ export default function BuyerSearchMatcher({ buyer: propBuyer, buyersList = [], 
                 </div>
               </div>
             ))}
+          </div>
+          {matchedItems.length > visibleCount && (
+            <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+              <span className="text-[11px] font-medium text-stone-500 tabular-nums">
+                Показано {Math.min(visibleCount, matchedItems.length)} из {matchedItems.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 12)}
+                className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Показать ещё {Math.min(12, matchedItems.length - visibleCount)}
+              </button>
+            </div>
+          )}
           </div>
         )}
       </div>

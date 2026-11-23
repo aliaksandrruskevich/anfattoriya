@@ -18,7 +18,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import PageHero from './PageHero';
 import LeadTaskList from './LeadTaskList';
-import BuyerSearchMatcher from './BuyerSearchMatcher';
+import BuyersCRMWorkspace from './BuyersCRMWorkspace';
 import SellerKanbanPipeline from './SellerKanbanPipeline';
 import LeadKanbanBoard from './LeadKanbanBoard';
 const CRMAnalyticsDashboard = dynamic(() => import('./CRMAnalyticsDashboard'), {
@@ -173,22 +173,6 @@ export default function AgentCabinetPage({
   // Strict Rights Matrix:
   // 1. Buyers visibility: Admin: All, Call-center: All, Realtor: Only Own
   const canViewAllBuyers = isAgentAdmin || isAgentCallCenter;
-  const canAddBuyers = Boolean(loggedInAgent);
-  const canEditBuyer = (buyer: Buyer): boolean => {
-    if (isAgentAdmin || isAgentCallCenter) return true;
-    if (!loggedInAgent) return false;
-    const curName = (loggedInAgent.name || '').toLowerCase().trim();
-    const curId = (loggedInAgent.id || '').trim();
-    const agId = (buyer.assignedAgentId || '').trim();
-    const agName = (buyer.assignedAgentName || '').toLowerCase().trim();
-    const regBy = (buyer.registeredBy || '').toLowerCase().trim();
-    return Boolean(
-      (agId && agId === curId) ||
-      (agName && (agName === curName || agName.includes(curName) || curName.includes(agName))) ||
-      (regBy && (regBy === curName || regBy.includes(curName) || curName.includes(regBy)))
-    );
-  };
-  const canDeleteBuyer = (buyer: Buyer): boolean => canEditBuyer(buyer);
 
   // 2. Sellers visibility: Admin: All, Call-center: All, Realtor: Only assigned to self
   const canViewAllSellers = isAgentAdmin || isAgentCallCenter;
@@ -450,6 +434,32 @@ export default function AgentCabinetPage({
   const [showRealtImporter, setShowRealtImporter] = useState<boolean>(false);
   const [sellerToPublishModal, setSellerToPublishModal] = useState<ColdSeller | null>(null);
   const [assignmentNotification, setAssignmentNotification] = useState<string | null>(null);
+  const [crmToast, setCrmToast] = useState<{ message: string; variant: 'success' | 'info' | 'error' } | null>(null);
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState<boolean>(false);
+  const [editingPropertyModal, setEditingPropertyModal] = useState<{
+    mode: 'create' | 'edit';
+    id?: string;
+    title: string;
+    type: Property['type'];
+    address: string;
+    district: string;
+    rooms: string;
+    area: string;
+    floor: string;
+    totalFloors: string;
+    priceUSD: string;
+    contractStatus: string;
+    isPublished: boolean;
+    photo: string;
+    description: string;
+  } | null>(null);
+
+  const showCrmToast = (message: string, variant: 'success' | 'info' | 'error' = 'info') => {
+    setCrmToast({ message, variant });
+    setTimeout(() => {
+      setCrmToast((prev) => (prev?.message === message ? null : prev));
+    }, 3800);
+  };
 
   const [institutionalRequests, setInstitutionalRequests] = useState<InstitutionalRequest[]>([]);
 
@@ -467,20 +477,6 @@ export default function AgentCabinetPage({
     return propertiesList.filter(p => p.assignedAgentId === loggedInAgent?.id).length;
   }, [propertiesList, loggedInAgent]);
 
-  const handleToggleBuyerPublished = (buyerId: string) => {
-    const updated = buyersList.map(b => {
-      if (b.id === buyerId) {
-        const nextPublished = !b.isPublicApproved;
-        return {
-          ...b,
-          isPublicApproved: nextPublished,
-          isPublishedOnSite: nextPublished,
-        };
-      }
-      return b;
-    });
-    setBuyersList(updated);
-  };
   const handleTogglePropertyPublished = (propId: string) => {
     const updated = propertiesList.map(p => {
       if (p.id === propId) {
@@ -571,11 +567,11 @@ export default function AgentCabinetPage({
 const handleSaveEditEmployee = async () => {
   if (!editingAgent) return;
   if (!editEmpName.trim()) {
-    alert("Пожалуйста, укажите ФИО специалиста.");
+    showCrmToast("Пожалуйста, укажите ФИО специалиста.", "error");
     return;
   }
   if (!editEmpPhone.trim()) {
-    alert("Пожалуйста, укажите контактный телефон специалиста.");
+    showCrmToast("Пожалуйста, укажите контактный телефон специалиста.", "error");
     return;
   }
 
@@ -603,7 +599,7 @@ const handleSaveEditEmployee = async () => {
     experienceStr = 'Без опыта';
   }
 
-  const finalPhoto = editEmpPhotoFile || editEmpPhotoUrl || editingAgent.photo || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200";
+  const finalPhoto = editEmpPhotoFile || editEmpPhotoUrl || editingAgent.photo || "/photo/hero-team-woman.jpg";
 
   const payload: any = {
     name: editEmpName.trim(),
@@ -636,7 +632,7 @@ const handleSaveEditEmployee = async () => {
 
     if (!res.ok) {
       const err = await res.json();
-      alert('Ошибка сохранения: ' + (err.error || 'неизвестная'));
+      showCrmToast('Ошибка сохранения: ' + (err.error || 'неизвестная'), 'error');
       return;
     }
 
@@ -673,7 +669,7 @@ const handleSaveEditEmployee = async () => {
     setAssignmentNotification(`Данные сотрудника ${editEmpName.trim()} успешно сохранены в CRM!`);
     setTimeout(() => setAssignmentNotification(null), 5000);
   } catch (error: any) {
-    alert('Ошибка сети при сохранении: ' + error.message);
+    showCrmToast('Ошибка сети при сохранении: ' + error.message, 'error');
   }
 };
   const handleToggleDismissAgent = (agent: Agent) => {
@@ -697,16 +693,16 @@ const handleSaveEditEmployee = async () => {
     });
 
     setAgentsList(updated);
-    alert(`Сотрудник ${agent.name} ${newDismissedState ? 'переведен в архив (уволен)' : 'восстановлен в штат и опубликован на сайте'}!`);
+    showCrmToast(`Сотрудник ${agent.name} ${newDismissedState ? 'переведен в архив (уволен)' : 'восстановлен в штат и опубликован на сайте'}!`, 'success');
   };
 
   const handleDeleteAgentPermanently = (agent: Agent) => {
     if (agent.id === 'admin') {
-      alert("Невозможно удалить системный аккаунт Главного Администратора.");
+      showCrmToast("Невозможно удалить системный аккаунт Главного Администратора.", "error");
       return;
     }
     if (!canManageEmployees) {
-      alert("Только Главный Администратор имеет право удалять сотрудников!");
+      showCrmToast("Только Главный Администратор имеет право удалять сотрудников!", "error");
       return;
     }
     if (!window.confirm(`ВНИМАНИЕ! Полностью удалить сотрудника ${agent.name} из базы данных CRM? Это действие необратимо. Закрепленные за ним продавцы вернутся в общий пул для переназначения.`)) {
@@ -749,7 +745,7 @@ const handleSaveEditEmployee = async () => {
       setLoggedInAgent(null);
     }
 
-    alert(`Сотрудник ${agent.name} удален из базы. Все продавцы возвращены в общий пул неназначенных.`);
+    showCrmToast(`Сотрудник ${agent.name} удален из базы. Все продавцы возвращены в общий пул неназначенных.`, 'info');
   };
 
     const handleResetStaffToRealEmployees = async () => {
@@ -766,11 +762,11 @@ const handleSaveEditEmployee = async () => {
       const data = await res.json();
       if (Array.isArray(data)) {
         setAgentsList(data);
-        alert(`Штат синхронизирован: ${data.length} сотрудников.`);
+        showCrmToast(`Штат синхронизирован: ${data.length} сотрудников.`, 'success');
       }
     } catch (e: any) {
       console.error('[handleResetStaffToRealEmployees]', e);
-      alert('Не удалось загрузить штат из базы. Проверьте соединение.');
+      showCrmToast('Не удалось загрузить штат из базы. Проверьте соединение.', 'error');
     }
   };
 
@@ -878,27 +874,6 @@ const handleSaveEditEmployee = async () => {
     }
   };
 
-  // New Buyer states
-  const [newBuyerName, setNewBuyerName] = useState('');
-  const [newBuyerPhone, setNewBuyerPhone] = useState('+375 ');
-  const [newBuyerBudget, setNewBuyerBudget] = useState('');
-  const [newBuyerPrefs, setNewBuyerPrefs] = useState('');
-  const [newBuyerStatus, setNewBuyerStatus] = useState('searching');
-  const [newBuyerPrefType, setNewBuyerPrefType] = useState<'apartment' | 'house' | 'commercial' | 'plot' | 'all'>('all');
-  const [newBuyerPrefRooms, setNewBuyerPrefRooms] = useState<string>('');
-  const [newBuyerPrefDistrict, setNewBuyerPrefDistrict] = useState<string>('');
-  const [newBuyerMinArea, setNewBuyerMinArea] = useState<string>('');
-  const [newBuyerMaxArea, setNewBuyerMaxArea] = useState<string>('');
-  const [newBuyerFloorPref, setNewBuyerFloorPref] = useState<'any' | 'not_first' | 'not_last' | 'middle' | 'top'>('any');
-  const [newBuyerRenovation, setNewBuyerRenovation] = useState<'any' | 'euro' | 'good' | 'raw' | 'repair_needed'>('any');
-  const [newBuyerAssignedAgent, setNewBuyerAssignedAgent] = useState<string>('');
-
-  // Edit Buyer extra states
-  const [editBuyerMaxArea, setEditBuyerMaxArea] = useState<string>('');
-  const [editBuyerFloorPref, setEditBuyerFloorPref] = useState<'any' | 'not_first' | 'not_last' | 'middle' | 'top'>('any');
-  const [editBuyerRenovation, setEditBuyerRenovation] = useState<'any' | 'euro' | 'good' | 'raw' | 'repair_needed'>('any');
-  const [editBuyerAssignedAgent, setEditBuyerAssignedAgent] = useState<string>('');
-  const [expandedMatchBuyerId, setExpandedMatchBuyerId] = useState<string | null>(null);
 
   // Cold Sellers Database states (синхронизируется с сервером через Providers при передаче пропсов)
   const [localSellersList, setLocalSellersList] = useState<ColdSeller[]>(() => {
@@ -1016,7 +991,7 @@ const handleSaveEditEmployee = async () => {
   // Delayed Seller Realtor Assignment Handler
   const handleAssignSellerAgent = (sellerId: string, agentName: string) => {
     if (!canAssignSellerRealtor) {
-      alert("Только Администратор или сотрудник Колл-центра может назначать или изменять риэлтера у продавца!");
+      showCrmToast("Только Администратор или сотрудник Колл-центра может назначать или изменять риэлтера у продавца!", "error");
       return;
     }
     const selectedAgentObj = agentsList.find(a => a.name === agentName);
@@ -1072,7 +1047,7 @@ const handleSaveEditEmployee = async () => {
     const target = sellersList.find(s => s.id === sellerId);
     if (!target) return;
     if (!canDeleteSeller(target)) {
-      alert("У вас нет прав на удаление этого продавца!");
+      showCrmToast("У вас нет прав на удаление этого продавца!", "error");
       return;
     }
     if (!window.confirm(`Удалить продавца ${target.name} из базы?`)) return;
@@ -1119,26 +1094,11 @@ const handleSaveEditEmployee = async () => {
   const [schedulingLead, setSchedulingLead] = useState<Lead | null>(null);
   const [newHistoryText, setNewHistoryText] = useState<{ [leadId: string]: string }>({});
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
-  const [buyersSearch, setBuyersSearch] = useState('');
-  const [buyersStatusFilter, setBuyersStatusFilter] = useState<string>('all');
-
-  // Edit Buyer states
-  const [editingBuyerId, setEditingBuyerId] = useState<string | null>(null);
-  const [editBuyerName, setEditBuyerName] = useState('');
-  const [editBuyerPhone, setEditBuyerPhone] = useState('');
-  const [editBuyerBudget, setEditBuyerBudget] = useState('');
-  const [editBuyerPrefs, setEditBuyerPrefs] = useState('');
-  const [editBuyerStatus, setEditBuyerStatus] = useState('searching');
-  const [editBuyerPrefType, setEditBuyerPrefType] = useState<'apartment' | 'house' | 'commercial' | 'plot' | 'all'>('all');
-  const [editBuyerPrefRooms, setEditBuyerPrefRooms] = useState<string>('');
-  const [editBuyerPrefDistrict, setEditBuyerPrefDistrict] = useState<string>('');
-  const [editBuyerMinArea, setEditBuyerMinArea] = useState<string>('');
 
   // Pagination states to prevent endless scroll issues
   const [leadsPage, setLeadsPage] = useState(1);
   const [listingsPage, setListingsPage] = useState(1);
   const [employeesPage, setEmployeesPage] = useState(1);
-  const [buyersPage, setBuyersPage] = useState(1);
   const [articlesPage, setArticlesPage] = useState(1);
 
   const handleExportLeadsCSV = () => {
@@ -1162,7 +1122,7 @@ const handleSaveEditEmployee = async () => {
       : leads;
 
     if (leadsToExport.length === 0) {
-      alert("Нет лидов для экспорта!");
+      showCrmToast("Нет лидов для экспорта", 'error');
       return;
     }
 
@@ -1198,30 +1158,14 @@ const handleSaveEditEmployee = async () => {
 
     const filename = `leads_export_${isFiltered ? 'filtered_' : ''}${new Date().toISOString().slice(0,10)}.csv`;
     downloadCSV(filename, headers, rows);
-    alert(`Успешно экспортировано ${leadsToExport.length} лидов в файл ${filename}!`);
+    showCrmToast(`Экспортировано ${leadsToExport.length} лидов в файл ${filename}`, 'success');
   };
 
   const handleExportBuyersCSV = () => {
-    const isFiltered = buyersSearch.trim() || buyersStatusFilter !== 'all';
-    const buyersToExport = isFiltered
-      ? buyersList.filter(buyer => {
-          const s = buyer.status || 'searching';
-          if (buyersStatusFilter !== 'all' && s !== buyersStatusFilter) return false;
-          if (buyersSearch.trim()) {
-            const q = buyersSearch.toLowerCase();
-            return (
-              buyer.name.toLowerCase().includes(q) ||
-              buyer.phone.includes(q) ||
-              buyer.preferences.toLowerCase().includes(q) ||
-              buyer.registeredBy.toLowerCase().includes(q)
-            );
-          }
-          return true;
-        })
-      : buyersList;
+    const buyersToExport = buyersList.filter(isBuyerVisibleToUser);
 
     if (buyersToExport.length === 0) {
-      alert("Нет инвесторов для экспорта!");
+      showCrmToast("Нет покупателей для экспорта", 'error');
       return;
     }
 
@@ -1232,14 +1176,15 @@ const handleSaveEditEmployee = async () => {
       'Телефон',
       'Бюджет (USD)',
       'Пожелания к объекту',
-      'Ответственный риэлтор',
+      'Ответственный риэлтер',
       'Статус подбора'
     ];
 
     const statusLabels: Record<string, string> = {
       'searching': 'В поиске',
       'negotiating': 'Переговоры',
-      'deal': 'Оформление'
+      'deal': 'Оформление',
+      'closed': 'Сделка закрыта'
     };
 
     const rows = buyersToExport.map(buyer => [
@@ -1249,19 +1194,47 @@ const handleSaveEditEmployee = async () => {
       buyer.phone,
       String(buyer.budgetUSD),
       buyer.preferences,
-      buyer.registeredBy,
+      buyer.assignedAgentName || buyer.registeredBy,
       statusLabels[buyer.status || 'searching'] || buyer.status || 'В поиске'
     ]);
 
-    const filename = `buyers_export_${isFiltered ? 'filtered_' : ''}${new Date().toISOString().slice(0,10)}.csv`;
+    const filename = `buyers_export_${new Date().toISOString().slice(0,10)}.csv`;
     downloadCSV(filename, headers, rows);
-    alert(`Успешно экспортировано ${buyersToExport.length} покупателей в файл ${filename}!`);
+    showCrmToast(`Экспортировано ${buyersToExport.length} покупателей в файл ${filename}`, 'success');
+  };
+
+  const handleExportBuyersExcelCSV = (filtered: Buyer[]) => {
+    if (filtered.length === 0) {
+      showCrmToast("Нет отфильтрованных покупателей для выгрузки", 'error');
+      return;
+    }
+    const rows = filtered.map(b => [
+      b.name,
+      b.phone,
+      b.prefType || 'Любой',
+      String(b.budgetUSD || Math.round((b.budgetBYN || 0) / (nbrbRate || 3.27))),
+      String(b.budgetBYN || Math.round((b.budgetUSD || 0) * (nbrbRate || 3.27))),
+      b.prefDistrict || 'Все районы',
+      b.prefRooms ? String(b.prefRooms) : 'Любая',
+      b.minArea ? String(b.minArea) : '—',
+      b.assignedAgentName || b.registeredBy || 'Администратор',
+      b.status === 'searching' ? 'Активный поиск' : b.status === 'negotiating' ? 'Переговоры' : b.status === 'deal' ? 'На сделке' : b.status === 'closed' ? 'Закрыто' : 'Архив',
+      b.preferences || '',
+      b.dateAdded || ''
+    ]);
+    const filename = `crm_buyers_registry_${new Date().toISOString().split('T')[0]}.csv`;
+    downloadCSV(
+      filename,
+      ['ФИО Покупателя', 'Телефон', 'Тип', 'Бюджет $ USD', 'Бюджет BYN', 'Район', 'Комнат', 'Мин. пл. м²', 'Ответственный', 'Статус', 'Пожелания', 'Дата регистрации'],
+      rows
+    );
+    showCrmToast(`Выгружено ${filtered.length} покупателей в Excel/CSV`, 'success');
   };
 
   const handleExportSellersCSV = () => {
     const sellersToExport = sellersList.filter(s => isSellerVisibleToUser(s));
     if (sellersToExport.length === 0) {
-      alert("Нет продавцов для экспорта!");
+      showCrmToast("Нет продавцов для экспорта", 'error');
       return;
     }
 
@@ -1301,7 +1274,7 @@ const handleSaveEditEmployee = async () => {
 
     const filename = `sellers_fattoria_${new Date().toISOString().slice(0,10)}.csv`;
     downloadCSV(filename, headers, rows);
-    alert(`Успешно экспортировано ${sellersToExport.length} продавцов в файл ${filename}!`);
+    showCrmToast(`Экспортировано ${sellersToExport.length} продавцов в файл ${filename}`, 'success');
   };
 
   const handleImportBuyers = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1317,18 +1290,19 @@ const handleSaveEditEmployee = async () => {
         if (file.name.endsWith('.json')) {
           newBuyers = JSON.parse(content);
         } else {
-          // Semi-colon separated: name;phone;budget;prefs
           const lines = content.split('\n');
           newBuyers = lines.filter(line => line.trim()).map(line => {
             const parts = line.split(';');
             return {
               id: `buyer-imp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-              name: parts[0]?.trim() || 'Imported Buyer',
+              name: parts[0]?.trim() || 'Новый покупатель',
               phone: parts[1]?.trim() || '+375',
               budgetUSD: parseInt(parts[2], 10) || 0,
-              budgetBYN: Math.round((parseInt(parts[2], 10) || 0) * 3.27),
+              budgetBYN: Math.round((parseInt(parts[2], 10) || 0) * (nbrbRate || 3.27)),
               preferences: parts[3]?.trim() || '',
               registeredBy: loggedInAgent ? loggedInAgent.name : "Администратор",
+              assignedAgentId: loggedInAgent?.id,
+              assignedAgentName: loggedInAgent?.name,
               status: 'searching',
               dateAdded: new Date().toLocaleDateString('ru-RU'),
               isPublicApproved: false,
@@ -1342,13 +1316,13 @@ const handleSaveEditEmployee = async () => {
         if (newBuyers.length > 0) {
           const updated = [...newBuyers, ...buyersList];
           setBuyersList(updated);
-          alert(`Успешно импортировано ${newBuyers.length} покупателей в базу!`);
+          showCrmToast(`Успешно импортировано ${newBuyers.length} покупателей в базу`, 'success');
         } else {
-          alert('Файл пуст или имеет неверный формат.');
+          showCrmToast('Файл пуст или имеет неверный формат', 'error');
         }
       } catch (err) {
         console.error('Import error:', err);
-        alert('Ошибка при разборе файла. Поддерживается JSON или текстовый формат (строки вида "Имя;Телефон;Бюджет;Пожелания").');
+        showCrmToast('Ошибка при разборе файла (поддерживается JSON или строки Имя;Телефон;Бюджет;Пожелания)', 'error');
       }
     };
     reader.readAsText(file);
@@ -1854,7 +1828,7 @@ const handleSaveEditEmployee = async () => {
                     }`}
                   >
                     <span className="flex items-center gap-2.5 truncate min-w-0">
-                      <Phone className="w-4 h-4 shrink-0 text-emerald-600 animate-pulse" />
+                      <Phone className="w-4 h-4 shrink-0 text-emerald-600" />
                       <span className="truncate">Колл-Центр оператора</span>
                     </span>
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md font-mono shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -2013,6 +1987,48 @@ const handleSaveEditEmployee = async () => {
                       </button>
 
                       <button
+                        onClick={() => setCabinetTab('leads_kanban')}
+                        className={`w-full px-3.5 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer outline-none ${
+                          cabinetTab === 'leads_kanban' 
+                            ? 'bg-[#8B5CF6] text-white shadow-md' 
+                            : 'text-stone-700 hover:bg-stone-100 hover:text-stone-900'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5 truncate min-w-0">
+                          <Briefcase className="w-4 h-4 shrink-0" />
+                          <span className="truncate">Канбан сделок</span>
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setCabinetTab('analytics')}
+                        className={`w-full px-3.5 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer outline-none ${
+                          cabinetTab === 'analytics' 
+                            ? 'bg-[#8B5CF6] text-white shadow-md' 
+                            : 'text-stone-700 hover:bg-stone-100 hover:text-stone-900'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5 truncate min-w-0">
+                          <TrendingUp className="w-4 h-4 shrink-0" />
+                          <span className="truncate">Аналитика</span>
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setCabinetTab('calendar')}
+                        className={`w-full px-3.5 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer outline-none ${
+                          cabinetTab === 'calendar' 
+                            ? 'bg-[#8B5CF6] text-white shadow-md' 
+                            : 'text-stone-700 hover:bg-stone-100 hover:text-stone-900'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5 truncate min-w-0">
+                          <Calendar className="w-4 h-4 shrink-0" />
+                          <span className="truncate">Календарь</span>
+                        </span>
+                      </button>
+
+                      <button
                         onClick={() => setCabinetTab('articles')}
                         className={`w-full px-3.5 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer outline-none ${
                           cabinetTab === 'articles' 
@@ -2029,7 +2045,7 @@ const handleSaveEditEmployee = async () => {
                   )}
                 </div>
 
-                <div className="pt-6 border-t border-neutral-800">
+                <div className="pt-4 border-t border-stone-200">
                   <button
                     onClick={() => {
                       if (onLogout) {
@@ -2039,7 +2055,7 @@ const handleSaveEditEmployee = async () => {
                         localStorage.removeItem('fp_logged_agent');
                       }
                     }}
-                    className="w-full px-4 py-2.5 bg-neutral-800 hover:bg-rose-600 hover:text-white text-rose-400 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer outline-none"
+                    className="w-full px-4 py-2.5 bg-stone-100 hover:bg-rose-600 hover:text-white text-rose-600 border border-stone-200 hover:border-rose-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer outline-none"
                   >
                     Выйти из кабинета
                   </button>
@@ -2118,11 +2134,16 @@ const handleSaveEditEmployee = async () => {
                       <h2 className="text-sm md:text-base font-black text-stone-900 tracking-tight truncate mt-0.5">
                         {cabinetTab === 'profile' && '👤 Визитная карточка риэлтера'}
                         {cabinetTab === 'leads' && '💼 Сводный реестр заявок и лидов'}
+                        {cabinetTab === 'leads_kanban' && '📊 Канбан-воронка сделок'}
+                        {cabinetTab === 'analytics' && '📈 Аналитика и эффективность отдела'}
+                        {cabinetTab === 'calendar' && '📅 Календарь показов и встреч'}
                         {cabinetTab === 'sellers' && '📞 База продавцов и контактов'}
                         {cabinetTab === 'listings' && '🏷️ База объектов недвижимости'}
                         {cabinetTab === 'chats' && '💬 Чаты с клиентами (Kufar)'}
                         {cabinetTab === 'buyers' && '💎 База инвесторов и покупателей'}
                         {cabinetTab === 'tasks' && '📋 Задачи и планер риэлтера'}
+                        {cabinetTab === 'callcenter' && '🎧 Рабочее место оператора колл-центра'}
+                        {cabinetTab === 'requests_registry' && '📜 Реестр запросов в инстанции'}
                         {cabinetTab === 'parsing' && '⚡ ИИ-Парсинг объявлений & Колл-центр'}
                         {cabinetTab === 'employees' && '👥 Кадровый состав агентов'}
                         {cabinetTab === 'sms_templates' && '💬 Шаблоны СМС рассылок'}
@@ -2133,43 +2154,70 @@ const handleSaveEditEmployee = async () => {
 
               {/* Right Actions & Status */}
 <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-between lg:justify-end shrink-0">
-  {/* Оставляем только эту кнопку для добавления покупателя */}
   <button
     onClick={() => {
       setCabinetTab('buyers');
       setIsAddingBuyer(true);
     }}
-    className="px-3.5 py-2 bg-purple-500 hover:bg-purple-400 text-slate-950 font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md shadow-purple-500/20 flex items-center gap-1.5 cursor-pointer outline-none shrink-0"
+    className="px-3.5 py-2 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer outline-none shrink-0"
   >
     <Plus className="w-3.5 h-3.5" />
-    <span className="hidden sm:inline">+ Инвестор / Покупатель</span>
+    <span>Покупатель</span>
   </button>
 
   <button
-    onClick={() => setCabinetTab('tasks')}
-    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all border border-slate-700 flex items-center gap-1.5 cursor-pointer outline-none shrink-0"
+    onClick={() => setIsNewTaskModalOpen(true)}
+    className="px-3.5 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold text-[11px] uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer outline-none shrink-0"
   >
-    <ListTodo className="w-3.5 h-3.5 text-purple-400" />
-    <span className="hidden sm:inline">+ Задача</span>
+    <ListTodo className="w-3.5 h-3.5 text-purple-300" />
+    <span>Задача</span>
   </button>
 </div>
 </div>
-                {/* Fattoria Pipeline Funnel Bar */}
-                <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-slate-400 font-mono">
-                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                    <span className="text-slate-500 uppercase tracking-wider text-[9px] mr-1">Этапы работы Fattoria:</span>
-                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">1. Заявка ({leads.filter(l => l.status === 'new').length})</span>
-                    <span className="text-slate-600">➔</span>
-                    <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">2. Переговоры ({buyersList.filter(b => b.status === 'negotiating').length})</span>
-                    <span className="text-slate-600">➔</span>
-                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">3. Оформление ({buyersList.filter(b => b.status === 'closing').length})</span>
-                    <span className="text-slate-600">➔</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-black">4. Успешная сделка</span>
+                {/* Fattoria Pipeline Funnel Bar (Interactive) */}
+                <div className="pt-3 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-stone-600 tabular-nums">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span className="text-stone-400 uppercase tracking-wider text-[9px] mr-1">Воронка:</span>
+                    <button
+                      type="button"
+                      onClick={() => hasFullAccess && setCabinetTab('leads')}
+                      className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
+                    >
+                      1. Заявка ({leads.filter(l => l.status === 'new').length})
+                    </button>
+                    <span className="text-stone-300">→</span>
+                    <button
+                      type="button"
+                      onClick={() => setCabinetTab('buyers')}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer"
+                    >
+                      2. Переговоры ({buyersList.filter(b => b.status === 'negotiating').length})
+                    </button>
+                    <span className="text-stone-300">→</span>
+                    <button
+                      type="button"
+                      onClick={() => setCabinetTab('buyers')}
+                      className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                    >
+                      3. Оформление ({buyersList.filter(b => b.status === 'deal' || b.status === 'closing').length})
+                    </button>
+                    <span className="text-stone-300">→</span>
+                    <button
+                      type="button"
+                      onClick={() => hasFullAccess ? setCabinetTab('leads_kanban') : setCabinetTab('buyers')}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors font-black cursor-pointer"
+                    >
+                      4. Успешная сделка ({buyersList.filter(b => b.status === 'closed').length})
+                    </button>
                   </div>
 
-                  <div className="text-[10px] font-bold text-slate-400">
-                    Задач в работе: <span className="text-purple-400 font-black font-mono">{tasksList.filter(t => t.status === 'pending').length}</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCabinetTab('tasks')}
+                    className="text-[11px] font-semibold text-stone-600 hover:text-stone-900 cursor-pointer"
+                  >
+                    Задач в работе: <span className="text-[#8B5CF6] font-black font-mono">{tasksList.filter(t => t.status === 'pending').length}</span>
+                  </button>
                 </div>
               </div>
 
@@ -2634,10 +2682,10 @@ const handleSaveEditEmployee = async () => {
                                 const updated = [newLead, ...leads];
                                 saveLeadsToStore(updated);
                                 (document.getElementById('ai-lead-text') as HTMLTextAreaElement).value = '';
-                                alert(`Лид успешно добавлен! Классификация: ${data.priority === 'urgent' ? '🔥 СРОЧНО' : 'Обычный'}`);
+                                showCrmToast(`Лид добавлен (${data.priority === 'urgent' ? 'СРОЧНО' : 'Обычный'})`, 'success');
                               }
                             } catch (err) {
-                              alert('Ошибка ИИ-распознавания. Проверьте соединение или введите данные вручную.');
+                              showCrmToast('Ошибка ИИ-распознавания. Проверьте соединение или введите данные вручную.', 'error');
                             }
                           }}
                           className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all shadow-md cursor-pointer"
@@ -2702,7 +2750,7 @@ const handleSaveEditEmployee = async () => {
                           <button
                             onClick={() => {
                               if (!newLeadPhone) {
-                                alert('Укажите контактный номер телефона клиента!');
+                                showCrmToast('Укажите контактный номер телефона клиента!', 'error');
                                 return;
                               }
                               const newLead: Lead = {
@@ -2722,7 +2770,7 @@ const handleSaveEditEmployee = async () => {
                               setNewLeadName('');
                               setNewLeadPhone('');
                               setNewLeadType('Продажа жилья (10 дней тест-драйв)');
-                              alert('Заявка успешно внесена в базу CRM!');
+                              showCrmToast('Заявка успешно внесена в базу CRM', 'success');
                             }}
                             className="px-5 py-2 bg-neutral-900 hover:bg-purple-500 hover:text-black font-extrabold text-xs text-white uppercase tracking-wider rounded-lg transition-all cursor-pointer"
                           >
@@ -3670,7 +3718,7 @@ const handleSaveEditEmployee = async () => {
                           <button
                             onClick={() => {
                               if (!newSellerName.trim() || !newSellerPhone.trim()) {
-                                alert("Заполните имя и телефон продавца!");
+                                showCrmToast("Заполните имя и телефон продавца!", 'error');
                                 return;
                               }
 
@@ -3681,7 +3729,7 @@ const handleSaveEditEmployee = async () => {
                                 phone: newSellerPhone.trim(),
                                 address: newSellerAddress.trim() || 'г. Минск',
                                 propertyType: newSellerType,
-                                askingPriceBYN: Math.round((Number(newSellerPrice) || 100000) * 3.27),
+                                askingPriceBYN: Math.round((Number(newSellerPrice) || 100000) * (nbrbRate || 3.27)),
                                 askingPriceUSD: Number(newSellerPrice) || 100000,
                                 status: newSellerStatus,
                                 assignedAgentName: assignedAg ? assignedAg.name : '',
@@ -3703,7 +3751,7 @@ const handleSaveEditEmployee = async () => {
                               setNewSellerPrice('');
                               setNewSellerNotes('');
                               setNewSellerAgent('');
-                              alert(`Продавец ${newSeller.name} успешно внесен! ${newSeller.assignedAgentName ? `Закреплен за: ${newSeller.assignedAgentName}` : 'Находится в общем пуле (не назначен).'}`);
+                              showCrmToast(`Продавец ${newSeller.name} добавлен (${newSeller.assignedAgentName || 'общий пул'})`, 'success');
                             }}
                             className="px-5 py-2 bg-emerald-600 text-white font-extrabold rounded-xl hover:bg-emerald-700 cursor-pointer shadow-md shadow-emerald-600/20"
                           >
@@ -4033,13 +4081,46 @@ const handleSaveEditEmployee = async () => {
                   properties={propertiesList}
                   loggedInAgent={loggedInAgent}
                   onDelete={(id) => {
-                    if (window.confirm('Вы уверены, что хотите удалить этот объект из вашей базы?')) {
-                      const updated = propertiesList.filter(p => p.id !== id);
-                      setPropertiesList(updated);
-                    }
+                    const updated = propertiesList.filter(p => p.id !== id);
+                    setPropertiesList(updated);
+                    showCrmToast('Объект удалён из базы', 'info');
                   }}
                   onEdit={(prop) => {
-                    alert(`Редактирование объекта: ${prop.title}`);
+                    setEditingPropertyModal({
+                      mode: 'edit',
+                      id: prop.id,
+                      title: prop.title || '',
+                      type: prop.type || 'apartment',
+                      address: prop.address || '',
+                      district: prop.district || '',
+                      rooms: prop.rooms ? String(prop.rooms) : '',
+                      area: prop.area ? String(prop.area) : '',
+                      floor: prop.floor ? String(prop.floor) : '',
+                      totalFloors: prop.totalFloors ? String(prop.totalFloors) : '',
+                      priceUSD: prop.priceUSD ? String(prop.priceUSD) : '',
+                      contractStatus: prop.contractStatus || 'draft',
+                      isPublished: Boolean(prop.isPublished),
+                      photo: prop.photo || prop.image || '',
+                      description: prop.description || '',
+                    });
+                  }}
+                  onCreateManual={() => {
+                    setEditingPropertyModal({
+                      mode: 'create',
+                      title: '',
+                      type: 'apartment',
+                      address: 'г. Минск, ',
+                      district: '',
+                      rooms: '2',
+                      area: '54',
+                      floor: '4',
+                      totalFloors: '9',
+                      priceUSD: '75000',
+                      contractStatus: 'draft',
+                      isPublished: false,
+                      photo: '/photo/hero-apartment.jpg',
+                      description: '',
+                    });
                   }}
                   onPublish={handleTogglePropertyPublished}
                   onGenerateRequest={(prop) => {
@@ -4532,26 +4613,26 @@ const handleSaveEditEmployee = async () => {
                             onClick={() => {
                               const nameParts = newEmpName.trim().split(/\s+/);
                               if (!newEmpName.trim() || nameParts.length < 2) {
-                                alert("Пожалуйста, укажите ФИО полностью (минимум Фамилия и Имя, как в паспорте).");
+                                showCrmToast("Пожалуйста, укажите ФИО полностью (минимум Фамилия и Имя, как в паспорте).", "error");
                                 return;
                               }
                               if (!newEmpRole.trim()) {
-                                alert("Пожалуйста, укажите должность специалиста в компании.");
+                                showCrmToast("Пожалуйста, укажите должность специалиста в компании.", "error");
                                 return;
                               }
                               if (!newEmpPhone.trim()) {
-                                alert("Пожалуйста, укажите контактный телефон сотрудника.");
+                                showCrmToast("Пожалуйста, укажите контактный телефон сотрудника.", "error");
                                 return;
                               }
 
                               const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                               if (!newEmpEmail.trim() || !emailRegex.test(newEmpEmail)) {
-                                alert("Пожалуйста, укажите корректный рабочий Email сотрудника.");
+                                showCrmToast("Пожалуйста, укажите корректный рабочий Email сотрудника.", "error");
                                 return;
                               }
 
                               if (!newEmpPassword || !isPasswordValid) {
-                                alert("Пароль слишком короткий! Минимальная длина пароля — 4 символа.");
+                                showCrmToast("Пароль слишком короткий! Минимальная длина пароля — 4 символа.", "error");
                                 return;
                               }
 
@@ -4568,7 +4649,7 @@ const handleSaveEditEmployee = async () => {
                                 experienceStr = 'Без опыта';
                               }
 
-                              const finalPhoto = newEmpPhotoFile || newEmpPhotoUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200";
+                              const finalPhoto = newEmpPhotoFile || newEmpPhotoUrl || "/photo/hero-team-woman.jpg";
 
                               const targetEmail = newEmpEmail.trim().toLowerCase();
                               const existingIndex = agentsList.findIndex(
@@ -4593,7 +4674,7 @@ const handleSaveEditEmployee = async () => {
                                   assignedManagerName: newEmpManager || updatedList[existingIndex].assignedManagerName,
                                   achievements: newEmpAchievements.trim() || undefined
                                 };
-                                alert(`Данные сотрудника ${newEmpName.trim()} с Email ${newEmpEmail.trim()} успешно обновлены! Установлен новый пароль: ${newEmpPassword.trim()}`);
+                                showCrmToast(`Данные сотрудника ${newEmpName.trim()} (${newEmpEmail.trim()}) обновлены!`, 'success');
                               } else {
                                 const newAgent: Agent = {
                                   id: `emp-${Date.now()}`,
@@ -4616,7 +4697,7 @@ const handleSaveEditEmployee = async () => {
                                   achievements: newEmpAchievements.trim() || undefined
                                 };
                                 updatedList = [...agentsList, newAgent];
-                                alert(`Успешно назначен! Специалист ${newAgent.name} зачислен в штат.\n\nЛогин: ${newAgent.email}\nПароль: ${newAgent.password}`);
+                                showCrmToast(`Специалист ${newAgent.name} зачислен в штат (${newAgent.email})`, 'success');
                               }
 
                               setAgentsList(updatedList);
@@ -5023,7 +5104,7 @@ const handleSaveEditEmployee = async () => {
 
                                   const updated = [newPropObj, ...propertiesList];
                                   setPropertiesList(updated);
-                                  alert(`Готово! Объект «${newPropObj.title}» успешно спарсен и выгружен в каталог компании!`);
+                                  showCrmToast(`Объект «${newPropObj.title}» успешно добавлен в каталог компании!`, 'success');
                                 }
                               }, (idx + 1) * 700);
                             });
@@ -5250,976 +5331,32 @@ const handleSaveEditEmployee = async () => {
                 </div>
               )}
 
-              {/* TAB CONTENTS 6: BUYERS */}
-              {activeTab === 'buyers' && (() => {
-                return (
-                  <div className="space-y-8 animate-fade-in font-sans text-xs">
-                    
-                    {/* CRM Database Isolation Switcher Banner */}
-                    <div className="bg-neutral-900 text-white p-4.5 rounded-2xl border border-neutral-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-purple-500/20 text-purple-400 rounded-xl">
-                          <Users className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider">
-                            {isAgentAdmin ? "База покупателей: Фильтрация контактов по сотрудникам" : `База покупателей сотрудника: ${loggedInAgent?.name}`}
-                          </h4>
-                          <p className="text-[11px] text-neutral-400 mt-0.5 font-medium">
-                            {isAgentAdmin 
-                              ? "База инвесторов и покупателей агентства. Выберите сотрудника для просмотра привязанных контактов."
-                              : "Покупатели и инвесторы, зафиксированные за вашим профилем или вашей рабочей группой."}
-                          </p>
-                        </div>
-                      </div>
-
-                      {isAgentAdmin && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">База сотрудника:</label>
-                          <select
-                            value={selectedAgentFilter}
-                            onChange={(e) => setSelectedAgentFilter(e.target.value)}
-                            className="bg-neutral-950 border border-neutral-700 text-white font-bold rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer"
-                          >
-                            <option value="all">🌐 Все сотрудники (Сводная)</option>
-                            {agentsList.map(ag => (
-                              <option key={ag.id} value={ag.name}>
-                                👤 {ag.name} ({ag.role || 'Сотрудник'})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Add Buyer Form (At the top for fast registration) */}
-                    {canAddBuyers && (
-                      <div className="bg-stone-50 border-2 border-purple-500/40 rounded-2xl p-5 sm:p-6 space-y-4 shadow-md relative overflow-hidden">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <h4 className="text-xs font-black text-purple-600 uppercase tracking-wider flex items-center gap-1.5">
-                            <Plus className="w-4 h-4" /> Добавить нового инвестора / покупателя в CRM-базу
-                          </h4>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] bg-stone-200 text-stone-800 font-bold px-2.5 py-0.5 rounded-full font-mono">
-                              Курс НБРБ: 1 USD = {nbrbRate.toFixed(4)} BYN
-                            </span>
-                            <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full uppercase">
-                              Приоритетная форма CRM
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">ФИО Клиента</label>
-                            <input
-                              type="text"
-                              placeholder="Анатолий Соболев"
-                              value={newBuyerName}
-                              onChange={(e) => setNewBuyerName(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-semibold"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Телефон Минск/РБ</label>
-                            <input
-                              type="text"
-                              placeholder="+375 (29) ___-__-__"
-                              value={newBuyerPhone}
-                              onChange={(e) => setNewBuyerPhone(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-mono font-bold"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Лимит бюджета (USD)</label>
-                            <input
-                              type="number"
-                              placeholder="65000"
-                              value={newBuyerBudget}
-                              onChange={(e) => setNewBuyerBudget(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-mono font-bold"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Статус подбора</label>
-                            <select
-                              value={newBuyerStatus}
-                              onChange={(e) => setNewBuyerStatus(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-2 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-semibold cursor-pointer"
-                            >
-                              <option value="searching">Активный поиск</option>
-                              <option value="negotiating">Ведутся переговоры</option>
-                              <option value="deal">В процессе оформления</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Structured Smart-Matching Criteria Row */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs pt-3 border-t border-dashed border-stone-200">
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Желаемый тип жилья</label>
-                            <select
-                              value={newBuyerPrefType}
-                              onChange={(e) => setNewBuyerPrefType(e.target.value as any)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-2 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-semibold cursor-pointer"
-                            >
-                              <option value="all">Любой / Все подряд</option>
-                              <option value="apartment">Квартира</option>
-                              <option value="house">Дом / Коттедж</option>
-                              <option value="commercial">Коммерческая недвижимость</option>
-                              <option value="plot">Участок земли</option>
-                            </select>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Кол-во комнат</label>
-                            <select
-                              value={newBuyerPrefRooms}
-                              onChange={(e) => setNewBuyerPrefRooms(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-2 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-semibold cursor-pointer"
-                            >
-                              <option value="">Любое кол-во комнат</option>
-                              <option value="1">1-комнатная (однушка)</option>
-                              <option value="2">2-комнатная (двушка)</option>
-                              <option value="3">3-комнатная (трешка)</option>
-                              <option value="4">4-комнатная и более</option>
-                            </select>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Район Минска</label>
-                            <select
-                              value={newBuyerPrefDistrict}
-                              onChange={(e) => setNewBuyerPrefDistrict(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-2 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-semibold cursor-pointer"
-                            >
-                              <option value="">Любой район</option>
-                              <option value="Первомайский">Первомайский район</option>
-                              <option value="Московский">Московский район</option>
-                              <option value="Фрунзенский">Фрунзенский район</option>
-                              <option value="Советский">Советский район</option>
-                              <option value="Центральный">Центральный район</option>
-                              <option value="Октябрьский">Октябрьский район</option>
-                              <option value="Ленинский">Ленинский район</option>
-                              <option value="Заводской">Заводской район</option>
-                              <option value="Партизанский">Партизанский район</option>
-                            </select>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] text-stone-500 font-bold uppercase">Мин. площадь (м²)</label>
-                            <input
-                              type="number"
-                              placeholder="например: 45"
-                              value={newBuyerMinArea}
-                              onChange={(e) => setNewBuyerMinArea(e.target.value)}
-                              className="w-full bg-white border border-stone-250 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-semibold"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-stone-500 font-bold uppercase">Пожелания к объекту недвижимости (критерии для автоподбора)</label>
-                          <input
-                            type="text"
-                            placeholder="например: Ищет 2-комнатную квартиру на Немиге до 60 кв.м."
-                            value={newBuyerPrefs}
-                            onChange={(e) => setNewBuyerPrefs(e.target.value)}
-                            className="w-full bg-white border border-stone-250 rounded-lg px-3 py-2.5 text-xs focus:ring-2 focus:ring-purple-500/20 outline-none font-medium"
-                          />
-                        </div>
-
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => {
-                              if (!newBuyerName || !newBuyerPhone) {
-                                alert('Укажите имя и телефон покупателя!');
-                                return;
-                              }
-                              const nb: Buyer = {
-                                id: `buyer-${Date.now()}`,
-                                name: newBuyerName,
-                                phone: newBuyerPhone,
-                                budgetUSD: parseInt(newBuyerBudget, 10) || 0,
-                                budgetBYN: Math.round((parseInt(newBuyerBudget, 10) || 0) * nbrbRate),
-                                preferences: newBuyerPrefs,
-                                registeredBy: loggedInAgent ? loggedInAgent.name : "Администратор",
-                                status: newBuyerStatus,
-                                dateAdded: new Date().toLocaleDateString('ru-RU'),
-                                prefType: newBuyerPrefType,
-                                prefRooms: newBuyerPrefRooms ? parseInt(newBuyerPrefRooms, 10) : undefined,
-                                prefDistrict: newBuyerPrefDistrict || undefined,
-                                minArea: newBuyerMinArea ? parseFloat(newBuyerMinArea) : undefined
-                              };
-                              const updated = [nb, ...buyersList];
-                              setBuyersList(updated);
-                              alert(`Покупатель ${newBuyerName} успешно внесен в реестр!`);
-                              setNewBuyerName('');
-                              setNewBuyerPhone('+375 ');
-                              setNewBuyerBudget('');
-                              setNewBuyerPrefs('');
-                              setNewBuyerPrefType('all');
-                              setNewBuyerPrefRooms('');
-                              setNewBuyerPrefDistrict('');
-                              setNewBuyerMinArea('');
-                            }}
-                            className="px-5 py-2.5 bg-neutral-900 hover:bg-purple-500 hover:text-black font-extrabold text-xs text-white uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm"
-                          >
-                            Зарегистрировать инвестора
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Buyers Analytics Dashboard */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 text-white shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Всего покупателей</span>
-                          <Users className="w-4 h-4 text-purple-500" />
-                        </div>
-                        <div className="mt-4">
-                          <span className="text-2xl font-black font-mono">{buyersList.length}</span>
-                          <span className="text-[10px] text-neutral-400 block mt-0.5">верифицировано в CRM</span>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-white border border-stone-200 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">Активный поиск</span>
-                          <Search className="w-4 h-4 text-indigo-500" />
-                        </div>
-                        <div className="mt-4">
-                          <span className="text-2xl font-black text-indigo-600 font-mono">
-                            {buyersList.filter(b => b.status === 'searching' || !b.status).length}
-                          </span>
-                          <span className="text-[10px] text-stone-500 block mt-0.5">подбирают недвижимость</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Smart Property Matching & Search Parameters Generator Module */}
-                    <BuyerSearchMatcher
-                      buyersList={buyersList}
-                      propertiesList={propertiesList}
-                      onUpdateBuyer={(updatedBuyer) => {
-                        const updated = buyersList.map(b => b.id === updatedBuyer.id ? updatedBuyer : b);
-                        setBuyersList(updated);
-                      }}
-                    />
-
-                    {/* Search and Filters panel */}
-                    <div className="bg-white border border-stone-200 p-4 rounded-xl shadow-sm space-y-3">
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        {/* Search */}
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-2.5 w-4 h-4 text-stone-400" />
-                          <input
-                            type="text"
-                            placeholder="Поиск по имени покупателя, телефону или критериям подбора..."
-                            value={buyersSearch}
-                            onChange={(e) => setBuyersSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-stone-50 text-neutral-900 border border-stone-200 rounded-lg text-xs focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none transition-all font-medium"
-                          />
-                        </div>
-
-                        {/* Status Buttons & Export */}
-                        <div className="flex flex-wrap items-center justify-between lg:justify-end gap-3 w-full lg:w-auto">
-                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mr-1 flex items-center gap-1">
-                              <Filter className="w-3 h-3" /> Статус клиента:
-                            </span>
-                            {[
-                              { id: 'all', label: 'Все' },
-                              { id: 'searching', label: 'В поиске' },
-                              { id: 'negotiating', label: 'Переговоры' },
-                              { id: 'deal', label: 'Оформление 📝' }
-                            ].map(f => (
-                              <button
-                                key={f.id}
-                                onClick={() => setBuyersStatusFilter(f.id)}
-                                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
-                                  buyersStatusFilter === f.id
-                                    ? 'bg-neutral-900 text-white shadow-sm'
-                                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                }`}
-                              >
-                                {f.label}
-                              </button>
-                            ))}
-                          </div>
-
-                          <button
-                            onClick={handleExportBuyersCSV}
-                            className="px-3.5 py-1.5 bg-purple-500 hover:bg-purple-600 text-neutral-950 font-black uppercase text-[10px] tracking-wider rounded-lg transition-all flex items-center gap-1.5 shadow-sm outline-none cursor-pointer border border-purple-400/20"
-                            title="Экспортировать покупателей в CSV"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Экспорт в CSV</span>
-                          </button>
-
-                          <label className="px-3.5 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-black uppercase text-[10px] tracking-wider rounded-lg transition-all flex items-center gap-1.5 shadow-sm outline-none cursor-pointer border border-stone-300/30">
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>Импорт из файла</span>
-                            <input 
-                              type="file" 
-                              className="hidden" 
-                              accept=".json,.txt,.csv" 
-                              onChange={handleImportBuyers}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Buyers List */}
-                    {(() => {
-                      const filteredBuyers = buyersList.filter(buyer => {
-                        // Apply agent filter only if admin selected a specific agent
-                        if (isAgentAdmin && selectedAgentFilter !== 'all') {
-                          if (!isRecordInAgentDb(buyer)) return false;
-                        }
-
-                        // status filter
-                        const s = buyer.status || 'searching';
-                        if (buyersStatusFilter !== 'all' && s !== buyersStatusFilter) return false;
-
-                        // text search
-                        if (buyersSearch.trim()) {
-                          const q = buyersSearch.toLowerCase();
-                          const matchesName = buyer.name.toLowerCase().includes(q);
-                          const matchesPhone = buyer.phone.includes(q);
-                          const matchesPrefs = buyer.preferences.toLowerCase().includes(q);
-                          const matchesAgent = buyer.registeredBy.toLowerCase().includes(q);
-                          return matchesName || matchesPhone || matchesPrefs || matchesAgent;
-                        }
-                        return true;
-                      });
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <input 
-                                type="checkbox"
-                                checked={selectedBuyerIds.length === filteredBuyers.length && filteredBuyers.length > 0}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedBuyerIds(filteredBuyers.map(b => b.id));
-                                  } else {
-                                    setSelectedBuyerIds([]);
-                                  }
-                                }}
-                                className="w-4 h-4 rounded border-stone-300 text-purple-500 focus:ring-purple-500 cursor-pointer"
-                              />
-                              <h4 className="text-xs font-black text-neutral-400 uppercase tracking-widest">
-                                Реестр инвесторов и покупателей ({filteredBuyers.length})
-                              </h4>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              {selectedBuyerIds.length > 0 && (
-                                <div className="flex items-center gap-2 animate-fade-in">
-                                  <span className="text-[10px] font-black uppercase text-purple-600 bg-purple-50 px-2 py-1 rounded-md">
-                                    Выбрано: {selectedBuyerIds.length}
-                                  </span>
-                                  <button
-                                    onClick={() => setIsMassMailing(true)}
-                                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                                  >
-                                    <Send className="w-3 h-3" /> Telegram
-                                  </button>
-                                  <button
-                                    onClick={() => setSelectedBuyerIds([])}
-                                    className="text-[10px] font-black uppercase text-stone-400 hover:text-rose-500 transition-colors px-1"
-                                  >
-                                    Сброс
-                                  </button>
-                                </div>
-                              )}
-
-                              <button
-                                onClick={() => {
-                                  const rows = filteredBuyers.map(b => [
-                                    b.name,
-                                    b.phone,
-                                    b.prefType || 'Любой',
-                                    String(b.budgetUSD || Math.round((b.budgetBYN || 0) / 3.27)),
-                                    String(b.budgetBYN || Math.round((b.budgetUSD || 0) * 3.27)),
-                                    b.prefDistrict || 'Все районы',
-                                    b.prefRooms ? String(b.prefRooms) : 'Любая',
-                                    b.minArea ? String(b.minArea) : '—',
-                                    b.assignedAgentName || b.registeredBy || 'Администратор',
-                                    b.status === 'searching' ? 'Активный поиск' : b.status === 'deal' ? 'На сделке' : b.status === 'reserved' ? 'Бронь' : 'Архив',
-                                    b.preferences || '',
-                                    b.dateAdded || ''
-                                  ]);
-                                  downloadCSV(`crm_buyers_registry_${new Date().toISOString().split('T')[0]}.csv`, ['ФИО Покупателя', 'Телефон', 'Тип', 'Бюджет $ USD', 'Бюджет BYN', 'Район', 'Комнат', 'Мин. пл. м²', 'Ответственный', 'Статус', 'Пожелания', 'Дата регистрации'], rows);
-                                }}
-                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
-                                title="Экспорт реестра покупателей в Excel/CSV для бухгалтерии и юристов"
-                              >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Экспорт в Excel / CSV</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          {filteredBuyers.length === 0 ? (
-                            <div className="text-center py-16 text-stone-400 text-xs font-medium border border-dashed border-stone-250 rounded-xl bg-transparent font-sans">
-                              Ни одного инвестора не найдено в базе по заданным критериям фильтрации.
-                            </div>
-                          ) : (
-                            (() => {
-                              const buyersPerPage = 4;
-                              const totalBuyersPages = Math.ceil(filteredBuyers.length / buyersPerPage) || 1;
-                              const buyersPageClamped = Math.min(buyersPage, totalBuyersPages);
-                              const paginatedBuyers = filteredBuyers.slice(
-                                (buyersPageClamped - 1) * buyersPerPage,
-                                buyersPageClamped * buyersPerPage
-                              );
-
-                              return (
-                                <div className="space-y-4">
-                                  <div className="grid grid-cols-1 gap-6">
-                                    {paginatedBuyers.map((buyer) => {
-                                const isBeingEdited = editingBuyerId === buyer.id;
-                                const buyerStatus = buyer.status || 'searching';
-
-                                // Advanced Property Matching Logic (Type & Price & Exact Room Count matching)
-                                const prefsLower = (buyer.preferences || '').toLowerCase();
-                                let parsedType: 'apartment' | 'commercial' | 'house' | 'plot' | 'all' = 'all';
-                                if (prefsLower.includes('квартир') || prefsLower.includes('комнат') || prefsLower.includes('студи') || prefsLower.includes('двушк') || prefsLower.includes('трешк') || prefsLower.includes('однушк')) {
-                                  parsedType = 'apartment';
-                                } else if (prefsLower.includes('дом') || prefsLower.includes('коттедж') || prefsLower.includes('дач') || prefsLower.includes('усадьб')) {
-                                  parsedType = 'house';
-                                } else if (prefsLower.includes('офис') || prefsLower.includes('коммерч') || prefsLower.includes('склад') || prefsLower.includes('производ') || prefsLower.includes('помещен')) {
-                                  parsedType = 'commercial';
-                                } else if (prefsLower.includes('участ') || prefsLower.includes('земл')) {
-                                  parsedType = 'plot';
-                                }
-
-                                // Extract room preference: "двушку", "1-комн", etc.
-                                let parsedRooms: number | null = null;
-                                if (prefsLower.includes('однокомн') || prefsLower.includes('1-комн') || prefsLower.includes('1к') || prefsLower.includes('однушк') || prefsLower.includes('1 комн') || prefsLower.includes('1-к ') || prefsLower.includes('однокомнат')) {
-                                  parsedRooms = 1;
-                                } else if (prefsLower.includes('двушк') || prefsLower.includes('двухкомн') || prefsLower.includes('2-комн') || prefsLower.includes('2к') || prefsLower.includes('двумя комн') || prefsLower.includes('2 комн') || prefsLower.includes('2-к ') || prefsLower.includes('двухкомнат')) {
-                                  parsedRooms = 2;
-                                } else if (prefsLower.includes('трешк') || prefsLower.includes('трехкомн') || prefsLower.includes('3-комн') || prefsLower.includes('3к') || prefsLower.includes('тремя комн') || prefsLower.includes('3 комн') || prefsLower.includes('3-к ') || prefsLower.includes('трехкомнат')) {
-                                  parsedRooms = 3;
-                                } else if (prefsLower.includes('четырехкомн') || prefsLower.includes('4-комн') || prefsLower.includes('4к') || prefsLower.includes('4 комн') || prefsLower.includes('4-к ') || prefsLower.includes('четырехкомнат')) {
-                                  parsedRooms = 4;
-                                }
-
-                                // Location keywords dictionary to match with address, title or features
-                                const locationKeywords = [
-                                  { key: 'первомайск', label: 'Первомайский район' },
-                                  { key: 'заводск', label: 'Заводской район' },
-                                  { key: 'октябрьск', label: 'Октябрьский район' },
-                                  { key: 'центральн', label: 'Центральный район' },
-                                  { key: 'советск', label: 'Советский район' },
-                                  { key: 'московск', label: 'Московский район' },
-                                  { key: 'фрунзенск', label: 'Фрунзенский район' },
-                                  { key: 'партизанск', label: 'Партизанский район' },
-                                  { key: 'ленинск', label: 'Ленинский район' },
-                                  { key: 'восток', label: 'Восток' },
-                                  { key: 'минск-мир', label: 'Минск-Мир' },
-                                  { key: 'немиг', label: 'Немига' },
-                                  { key: 'колодищ', label: 'Колодищи' },
-                                  { key: 'ратомк', label: 'Ратомка' },
-                                  { key: 'тарасов', label: 'Тарасово' },
-                                  { key: 'раубич', label: 'Раубичи' },
-                                  { key: 'логойск', label: 'Логойск' },
-                                  { key: 'заславл', label: 'Заславль' }
-                                ];
-
-                                const matchedKeywords = locationKeywords.filter(item => 
-                                  prefsLower.includes(item.key)
-                                );
-
-                                 // Resolve structured preference or parsed fallback
-                                const resolvedType = buyer.prefType !== undefined && buyer.prefType !== 'all' ? buyer.prefType : parsedType;
-                                const resolvedRooms = buyer.prefRooms !== undefined ? buyer.prefRooms : parsedRooms;
-                                const resolvedDistrict = buyer.prefDistrict || (matchedKeywords.length > 0 ? matchedKeywords[0].label.replace(' район', '') : null);
-                                const resolvedMinArea = buyer.minArea || 0;
-                                const effectiveBudgetBYN = buyer.budgetBYN || (buyer.budgetUSD ? Math.round(buyer.budgetUSD * 3.27) : 0);
-
-                                // Weighted matching score evaluation with STRICT TYPE ENFORCEMENT
-                                const matchedProperties = propertiesList.map(p => {
-                                  // 1. STRICT DISQUALIFIER: Property Type
-                                  // If buyer explicitly wants an apartment, house, commercial, or plot — DISQUALIFY ALL OTHERS!
-                                  if (resolvedType && resolvedType !== 'all') {
-                                    if (p.type !== resolvedType) {
-                                      return { property: p, score: 0, breakdown: { typeScore: 0, roomsScore: 0, priceScore: 0, locationScore: 0, areaScore: 0 } };
-                                    }
-                                  }
-
-                                  // 2. STRICT DISQUALIFIER: Maximum Budget (BYN)
-                                  // Disqualify properties that exceed budget by > 12%
-                                  if (effectiveBudgetBYN > 0) {
-                                    if (p.priceBYN > effectiveBudgetBYN * 1.12) {
-                                      return { property: p, score: 0, breakdown: { typeScore: 100, roomsScore: 0, priceScore: 0, locationScore: 0, areaScore: 0 } };
-                                    }
-                                  }
-
-                                  let typeScore = 100;
-                                  let roomsScore = 100;
-                                  let priceScore = 100;
-                                  let locationScore = 100;
-                                  let areaScore = 100;
-
-                                  // Price Scoring
-                                  if (effectiveBudgetBYN > 0) {
-                                    if (p.priceBYN <= effectiveBudgetBYN) {
-                                      priceScore = 100;
-                                    } else {
-                                      const excess = (p.priceBYN - effectiveBudgetBYN) / effectiveBudgetBYN;
-                                      priceScore = Math.max(50, Math.round(100 - excess * 300));
-                                    }
-                                  }
-
-                                  // Rooms Match (for apartments)
-                                  if (resolvedRooms && p.type === 'apartment') {
-                                    let propRooms = p.rooms;
-                                    if (propRooms === undefined || propRooms === null) {
-                                      const pTitle = p.title.toLowerCase();
-                                      if (pTitle.includes('однокомн') || pTitle.includes('1-комн') || pTitle.includes('1к') || pTitle.includes('однушк') || pTitle.includes('1 комн')) propRooms = 1;
-                                      else if (pTitle.includes('двушк') || pTitle.includes('двухкомн') || pTitle.includes('2-комн') || pTitle.includes('2к')) propRooms = 2;
-                                      else if (pTitle.includes('трешк') || pTitle.includes('трехкомн') || pTitle.includes('3-комн') || pTitle.includes('3к')) propRooms = 3;
-                                      else if (pTitle.includes('четырехкомн') || pTitle.includes('4-комн') || pTitle.includes('4к')) propRooms = 4;
-                                      else propRooms = 0;
-                                    }
-                                    if (propRooms > 0 && propRooms !== resolvedRooms) {
-                                      roomsScore = Math.abs(propRooms - resolvedRooms) === 1 ? 60 : 20;
-                                    }
-                                  }
-
-                                  // Location Match (Soft boost, NOT a hard zero if in same city)
-                                  if (resolvedDistrict) {
-                                    const dLower = resolvedDistrict.toLowerCase();
-                                    const checkStr = (p.address + ' ' + p.title + ' ' + (p.features || []).join(' ')).toLowerCase();
-                                    if (checkStr.includes(dLower)) {
-                                      locationScore = 100;
-                                    } else {
-                                      locationScore = 70; // Soft score so properties aren't mistakenly hidden
-                                    }
-                                  }
-
-                                  // Area Match
-                                  if (resolvedMinArea > 0) {
-                                    if (p.area >= resolvedMinArea) {
-                                      areaScore = 100;
-                                    } else {
-                                      const areaRatio = p.area / resolvedMinArea;
-                                      areaScore = areaRatio >= 0.8 ? Math.round(areaRatio * 100) : 40;
-                                    }
-                                  }
-
-                                  const totalScore = Math.round((typeScore * 0.35) + (priceScore * 0.3) + (roomsScore * 0.2) + (locationScore * 0.1) + (areaScore * 0.05));
-
-                                  return {
-                                    property: p,
-                                    score: totalScore,
-                                    breakdown: { typeScore, roomsScore, priceScore, locationScore, areaScore }
-                                  };
-                                })
-                                .filter(item => item.score > 0)
-                                .sort((a, b) => b.score - a.score);
-
-                                return (
-                                  <div key={buyer.id} className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm space-y-4 hover:border-purple-500/40 transition-all font-sans text-xs relative overflow-hidden">
-                                    <div className="absolute top-4 left-4 z-10">
-                                      <input 
-                                        type="checkbox"
-                                        checked={selectedBuyerIds.includes(buyer.id)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedBuyerIds([...selectedBuyerIds, buyer.id]);
-                                          } else {
-                                            setSelectedBuyerIds(selectedBuyerIds.filter(id => id !== buyer.id));
-                                          }
-                                        }}
-                                        className="w-4 h-4 rounded border-stone-300 text-purple-500 focus:ring-purple-500 cursor-pointer"
-                                      />
-                                    </div>
-                                    
-                                    {/* Top bar: Info and Actions */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-sans pl-8">
-                                      <div className="space-y-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          {isBeingEdited ? (
-                                            <input
-                                              type="text"
-                                              value={editBuyerName}
-                                              onChange={(e) => setEditBuyerName(e.target.value)}
-                                              className="bg-stone-50 text-xs border border-stone-300 text-neutral-900 rounded-md px-2 py-1 outline-none font-bold focus:ring-1 focus:ring-purple-500"
-                                            />
-                                          ) : (
-                                            <h4 className="font-extrabold text-sm text-neutral-950">{buyer.name}</h4>
-                                          )}
-
-                                          <span className={`text-[8px] uppercase tracking-wider px-2.5 py-1 rounded-full font-extrabold ${
-                                            buyerStatus === 'searching' ? 'bg-purple-100 text-purple-800' :
-                                            buyerStatus === 'negotiating' ? 'bg-indigo-100 text-indigo-800' :
-                                            'bg-emerald-100 text-emerald-800'
-                                          }`}>
-                                            {buyerStatus === 'searching' ? 'Активный поиск' :
-                                             buyerStatus === 'negotiating' ? 'Переговоры' :
-                                             'Оформление 📝'}
-                                          </span>
-
-                                          {/* Restricted read-only lock badge */}
-                                          {!canEditBuyer(buyer) && (
-                                            <span className="text-[8px] uppercase tracking-wider px-2 py-1 bg-stone-100 text-stone-500 rounded-full font-bold flex items-center gap-1">
-                                              🔒 Только чтение
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        <div className="flex items-center gap-2 text-[11px] text-stone-500 font-sans flex-wrap">
-                                          <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                                          <span>Добавлен: {buyer.dateAdded}</span>
-                                          <span className="text-stone-300">•</span>
-                                          <Phone className="w-3.5 h-3.5 text-purple-500" />
-                                          {isBeingEdited ? (
-                                            <input
-                                              type="text"
-                                              value={editBuyerPhone}
-                                              onChange={(e) => setEditBuyerPhone(e.target.value)}
-                                              className="bg-stone-50 text-xs border border-stone-300 text-neutral-900 rounded-md px-2 py-1 outline-none font-mono focus:ring-1 focus:ring-purple-500"
-                                            />
-                                          ) : (
-                                            <span className="font-mono font-bold text-neutral-900">{buyer.phone}</span>
-                                          )}
-                                          <span className="text-stone-300">•</span>
-                                          <span className="text-stone-400 font-sans">Регистратор: {buyer.registeredBy}</span>
-                                        </div>
-                                      </div>
-
-                                      {/* Actions and Budget */}
-                                      <div className="flex items-center gap-4 self-start sm:self-center font-sans font-medium text-stone-600">
-                                        <div className="text-right">
-                                          <span className="text-[8px] text-stone-400 uppercase font-black block tracking-wider">Макс. Бюджет</span>
-                                          {isBeingEdited ? (
-                                            <div className="flex items-center gap-1 mt-1">
-                                              <input
-                                                type="number"
-                                                value={editBuyerBudget}
-                                                onChange={(e) => setEditBuyerBudget(e.target.value)}
-                                                className="bg-stone-50 text-xs border border-stone-300 text-purple-600 font-mono font-bold rounded px-2 py-1 outline-none w-24 focus:ring-1 focus:ring-purple-500"
-                                              />
-                                              <span className="text-xs font-bold text-stone-500">бел. руб.</span>
-                                            </div>
-                                          ) : (
-                                            <span className="text-base font-black text-purple-600 font-mono">
-                                              {(buyer.budgetBYN || Math.round((buyer.budgetUSD || 0) * 3.27)).toLocaleString()} бел. руб.
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {/* Hide edit/delete actions for restricted users */}
-                                        {(canEditBuyer(buyer) || canDeleteBuyer(buyer)) && (
-                                          <div className="flex items-center gap-1 border-l border-stone-150 pl-4 font-sans">
-                                            {isBeingEdited ? (
-                                              <div className="flex items-center gap-1.5">
-                                                <button
-                                                  onClick={() => {
-                                                    const updated = buyersList.map(b => b.id === buyer.id ? {
-                                                      ...b,
-                                                      name: editBuyerName,
-                                                      phone: editBuyerPhone,
-                                                      budgetUSD: parseInt(editBuyerBudget, 10) || 0,
-                                                      preferences: editBuyerPrefs,
-                                                      status: editBuyerStatus,
-                                                      prefType: editBuyerPrefType,
-                                                      prefRooms: editBuyerPrefRooms ? parseInt(editBuyerPrefRooms, 10) : undefined,
-                                                      prefDistrict: editBuyerPrefDistrict || undefined,
-                                                      minArea: editBuyerMinArea ? parseFloat(editBuyerMinArea) : undefined
-                                                    } : b);
-                                                    setBuyersList(updated);
-                                                    setEditingBuyerId(null);
-                                                    alert("Информация о покупателе успешно обновлена!");
-                                                  }}
-                                                  className="text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-800 bg-transparent px-2.5 py-1.5 cursor-pointer"
-                                                >
-                                                  ОК
-                                                </button>
-                                                <button
-                                                  onClick={() => setEditingBuyerId(null)}
-                                                  className="text-[10px] font-black uppercase text-stone-500 hover:text-stone-800 bg-transparent px-2.5 py-1.5 cursor-pointer"
-                                                >
-                                                  Отмена
-                                                </button>
-                                              </div>
-                                            ) : (
-                                              canEditBuyer(buyer) && (
-                                                <button
-                                                  onClick={() => {
-                                                    setEditingBuyerId(buyer.id);
-                                                    setEditBuyerName(buyer.name);
-                                                    setEditBuyerPhone(buyer.phone);
-                                                    setEditBuyerBudget(String(buyer.budgetUSD));
-                                                    setEditBuyerPrefs(buyer.preferences);
-                                                    setEditBuyerStatus(buyer.status || 'searching');
-                                                    setEditBuyerPrefType(buyer.prefType || 'all');
-                                                    setEditBuyerPrefRooms(buyer.prefRooms ? String(buyer.prefRooms) : '');
-                                                    setEditBuyerPrefDistrict(buyer.prefDistrict || '');
-                                                    setEditBuyerMinArea(buyer.minArea ? String(buyer.minArea) : '');
-                                                  }}
-                                                  className="p-1.5 hover:bg-stone-100 text-stone-500 hover:text-indigo-600 rounded-lg transition-colors cursor-pointer"
-                                                  title="Редактировать"
-                                                >
-                                                  <Edit3 className="w-4.5 h-4.5" />
-                                                </button>
-                                              )
-                                            )}
-
-                                            <button
-                                              onClick={() => handleToggleBuyerPublished(buyer.id)}
-                                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition-all cursor-pointer ${
-                                                buyer.isPublicApproved
-                                                  ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300"
-                                                  : "bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300"
-                                              }`}
-                                              title={buyer.isPublicApproved ? "Отображается на сайте в списке запросов (кликните, чтобы скрыть во внутреннюю CRM)" : "Только внутри CRM (кликните, чтобы опубликовать на сайте)"}
-                                            >
-                                              {buyer.isPublicApproved ? "🌐 На сайте" : "🔒 Только в CRM"}
-                                            </button>
-                                            {canDeleteBuyer(buyer) && (
-                                              <button
-                                                onClick={() => {
-                                                  if (window.confirm(`Вы действительно хотите удалить инвестора ${buyer.name} из CRM-базы?`)) {
-                                                    const updated = buyersList.filter(b => b.id !== buyer.id);
-                                                    setBuyersList(updated);
-                                                  }
-                                                }}
-                                                className="p-1.5 hover:bg-stone-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                                                title="Удалить"
-                                              >
-                                                <Trash className="w-4.5 h-4.5" />
-                                              </button>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Inline Editing Controls for Criteria */}
-                                    {isBeingEdited && (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-purple-500/5 p-3 rounded-lg border border-purple-500/15 text-[11px] mt-2">
-                                        <div className="space-y-1">
-                                          <span className="font-bold text-stone-500 uppercase text-[9px]">Желаемый тип</span>
-                                          <select
-                                            value={editBuyerPrefType}
-                                            onChange={(e) => setEditBuyerPrefType(e.target.value as any)}
-                                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 cursor-pointer font-semibold outline-none"
-                                          >
-                                            <option value="all">Любой</option>
-                                            <option value="apartment">Квартира</option>
-                                            <option value="house">Дом</option>
-                                            <option value="commercial">Коммерческая</option>
-                                            <option value="plot">Участок</option>
-                                          </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <span className="font-bold text-stone-500 uppercase text-[9px]">Кол-во комнат</span>
-                                          <select
-                                            value={editBuyerPrefRooms}
-                                            onChange={(e) => setEditBuyerPrefRooms(e.target.value)}
-                                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 cursor-pointer font-semibold outline-none"
-                                          >
-                                            <option value="">Любое</option>
-                                            <option value="1">1 комната</option>
-                                            <option value="2">2 комнаты</option>
-                                            <option value="3">3 комнаты</option>
-                                            <option value="4">4+ комнат</option>
-                                          </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <span className="font-bold text-stone-500 uppercase text-[9px]">Район Минска</span>
-                                          <select
-                                            value={editBuyerPrefDistrict}
-                                            onChange={(e) => setEditBuyerPrefDistrict(e.target.value)}
-                                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 cursor-pointer font-semibold outline-none"
-                                          >
-                                            <option value="">Любой район</option>
-                                            <option value="Первомайский">Первомайский</option>
-                                            <option value="Московский">Московский</option>
-                                            <option value="Фрунзенский">Фрунзенский</option>
-                                            <option value="Советский">Советский</option>
-                                            <option value="Центральный">Центральный</option>
-                                            <option value="Октябрьский">Октябрьский</option>
-                                            <option value="Ленинский">Ленинский</option>
-                                            <option value="Заводской">Заводской</option>
-                                            <option value="Партизанский">Партизанский</option>
-                                          </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <span className="font-bold text-stone-500 uppercase text-[9px]">Мин. площадь (м²)</span>
-                                          <input
-                                            type="number"
-                                            value={editBuyerMinArea}
-                                            placeholder="Любая"
-                                            onChange={(e) => setEditBuyerMinArea(e.target.value)}
-                                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 font-semibold outline-none"
-                                          />
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Preferences / Criteria visual layout */}
-                                    <div className="p-3 bg-stone-50 rounded-xl space-y-2 border border-stone-150 font-sans">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[9px] uppercase tracking-wider text-stone-400 font-bold">Параметры и критерии поиска</span>
-                                        <span className="text-[10px] font-bold text-stone-500 bg-stone-200/60 px-2 py-0.5 rounded">
-                                          {resolvedType === 'apartment' ? 'Квартира' :
-                                           resolvedType === 'house' ? 'Дом' :
-                                           resolvedType === 'commercial' ? 'Коммерческая' :
-                                           resolvedType === 'plot' ? 'Участок' : 'Все типы'}
-                                        </span>
-                                      </div>
-
-                                      {/* Parameter Badges Row */}
-                                      <div className="flex flex-wrap gap-2 pt-1">
-                                        <span className="bg-white border border-stone-200 text-neutral-800 text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 shadow-sm">
-                                          🚪 {resolvedRooms ? `${resolvedRooms}-комн.` : 'Любые комнаты'}
-                                        </span>
-                                        <span className="bg-white border border-stone-200 text-neutral-800 text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 shadow-sm">
-                                          📍 {resolvedDistrict ? `${resolvedDistrict} р-н` : 'Любой район'}
-                                        </span>
-                                        <span className="bg-white border border-stone-200 text-neutral-800 text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 shadow-sm">
-                                          📐 {resolvedMinArea > 0 ? `от ${resolvedMinArea} м²` : 'Любая площадь'}
-                                        </span>
-                                        <span className="bg-white border border-stone-200 text-purple-800 text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 shadow-sm">
-                                          💰 до ${(buyer.budgetUSD ?? Math.round((buyer.budgetBYN || 0) / 3.27)).toLocaleString()}
-                                        </span>
-                                      </div>
-
-                                      {isBeingEdited ? (
-                                        <div className="space-y-2 pt-2">
-                                          <textarea
-                                            value={editBuyerPrefs}
-                                            onChange={(e) => setEditBuyerPrefs(e.target.value)}
-                                            className="w-full bg-white text-xs border border-stone-300 text-neutral-900 rounded-lg p-2 focus:ring-1 focus:ring-purple-500 outline-none resize-none font-medium"
-                                            rows={2}
-                                            placeholder="Дополнительные комментарии к поиску..."
-                                          />
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold text-stone-500">Статус подбора:</span>
-                                            <select
-                                              value={editBuyerStatus}
-                                              onChange={(e) => setEditBuyerStatus(e.target.value)}
-                                              className="bg-white border border-stone-300 text-xs rounded px-2 py-1 cursor-pointer font-bold"
-                                            >
-                                              <option value="searching">Активный поиск</option>
-                                              <option value="negotiating">Ведутся переговоры</option>
-                                              <option value="deal">В процессе оформления</option>
-                                            </select>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <p className="text-xs font-semibold text-neutral-600 italic leading-normal border-t border-stone-200/50 pt-2">
-                                          «{buyer.preferences || "Критерии подбора не заполнены."}»
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    {/* Automated Property Matching Engine */}
-                                    <div className="pt-3 border-t border-dashed border-stone-200">
-                                      <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                          <span className="bg-purple-500 text-neutral-950 font-black text-[9px] uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
-                                            <Sparkles className="w-3 h-3 shrink-0 text-neutral-950" /> СМАРТ ПОДБОР
-                                          </span>
-                                          <span className="text-[11px] text-stone-600 font-bold">
-                                            Релевантные предложения ({resolvedRooms ? `${resolvedRooms}-комнатные` : 'все варианты'} в районе {resolvedDistrict || 'любом'}): <span className="text-indigo-600 font-mono font-black">{matchedProperties.length}</span>
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {matchedProperties.length === 0 ? (
-                                        <div className="p-3 bg-stone-50 rounded-lg text-center text-stone-400 text-[11px] font-medium border border-stone-150 leading-relaxed">
-                                          В каталоге агентства сейчас нет объектов, подходящих под строгие критерии:
-                                          <br />
-                                          <span className="font-bold text-stone-500">
-                                            Тип: {resolvedType === 'apartment' ? 'Квартира' : resolvedType === 'house' ? 'Дом' : resolvedType === 'commercial' ? 'Коммерческая' : resolvedType === 'plot' ? 'Участок' : 'Все'} • Комнат: {resolvedRooms || 'любое'} • Район: {resolvedDistrict || 'любой'} • Бюджет до ${Math.round((buyer.budgetUSD ?? ((buyer.budgetBYN || 0) / 3.27)) * 1.15).toLocaleString()}
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                          {matchedProperties.slice(0, 3).map(item => { // Show top 3 best matching offers
-                                            const p = item.property;
-                                            const score = item.score;
-                                            const bUSD = buyer.budgetUSD ?? Math.round((buyer.budgetBYN || 0) / 3.27);
-                                            const exceedsBudget = bUSD > 0 && p.priceUSD > bUSD;
-                                            const diffPercent = exceedsBudget && bUSD > 0 ? Math.round(((p.priceUSD - bUSD) / bUSD) * 100) : 0;
-                                            
-                                            return (
-                                              <div key={p.id} className="bg-white border border-stone-200 rounded-lg p-2.5 flex gap-2.5 hover:shadow-sm hover:border-purple-500/30 transition-all relative">
-                                                <img
-                                                  src={p.photo}
-                                                  alt={p.title}
-                                                  className="w-12 h-12 object-cover rounded-md shrink-0 border border-stone-100"
-                                                />
-                                                <div className="min-w-0 flex-1 space-y-0.5 text-left">
-                                                  <div className="flex items-center justify-between gap-1">
-                                                    <h5 className="text-[10px] font-extrabold text-neutral-900 truncate" title={p.title}>
-                                                      {p.title}
-                                                    </h5>
-                                                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
-                                                      score >= 90 ? 'bg-emerald-100 text-emerald-800' :
-                                                      score >= 75 ? 'bg-indigo-100 text-indigo-800' :
-                                                      'bg-purple-100 text-purple-800'
-                                                    }`}>
-                                                      {score}%
-                                                    </span>
-                                                  </div>
-                                                  <p className="text-[9px] text-stone-400 truncate">{p.address}</p>
-                                                  <div className="flex items-center justify-between">
-                                                    <p className="text-[10px] font-black text-neutral-800 font-mono">
-                                                      ${(p.priceUSD || 0).toLocaleString()}
-                                                    </p>
-                                                    
-                                                    {exceedsBudget ? (
-                                                      <span className="text-[8px] font-bold text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-200 scale-90">
-                                                        +{diffPercent}% к бюджету
-                                                      </span>
-                                                    ) : (
-                                                      <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-150 scale-90">
-                                                        В бюджете
-                                                      </span>
-                                                    )}
-                                                  </div>
-                                                </div>
-
-                                                <button
-                                                  onClick={() => {
-                                                    alert(`Коммерческое предложение с объектом «${p.title}» (${(p.priceUSD || 0).toLocaleString()} $) успешно сформировано риелтором ${loggedInAgent ? loggedInAgent.name : "Гордович Кирилл"} и отправлено клиенту ${buyer.name} по Viber/Telegram на номер ${buyer.phone}!`);
-                                                  }}
-                                                  className="absolute right-2 bottom-1.5 bg-neutral-900 hover:bg-purple-500 hover:text-black text-[8px] text-white font-extrabold px-2 py-1 rounded transition-colors cursor-pointer"
-                                                  title="Сформировать КП и отправить"
-                                                >
-                                                  Предложить
-                                                </button>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {renderPagination(buyersPageClamped, totalBuyersPages, setBuyersPage)}
-                          </div>
-                        );
-                      })()
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        })()}
+              {/* TAB CONTENTS 6: BUYERS (Bitrix24 / amoCRM Workspace) */}
+              {activeTab === 'buyers' && (
+                <BuyersCRMWorkspace
+                  buyersList={buyersList}
+                  setBuyersList={setBuyersList}
+                  propertiesList={propertiesList}
+                  agentsList={agentsList}
+                  loggedInAgent={loggedInAgent}
+                  isAgentAdmin={isAgentAdmin}
+                  isAgentCallCenter={isAgentCallCenter}
+                  selectedAgentFilter={selectedAgentFilter}
+                  setSelectedAgentFilter={setSelectedAgentFilter}
+                  nbrbRate={nbrbRate}
+                  selectedBuyerIds={selectedBuyerIds}
+                  setSelectedBuyerIds={setSelectedBuyerIds}
+                  isAddingBuyer={isAddingBuyer}
+                  setIsAddingBuyer={setIsAddingBuyer}
+                  onOpenMassMailing={() => setIsMassMailing(true)}
+                  onExportCSV={handleExportBuyersCSV}
+                  onExportExcelCSV={handleExportBuyersExcelCSV}
+                  onImportBuyers={handleImportBuyers}
+                  tasksList={tasksList}
+                  onSaveTasks={saveTasks}
+                  onNotify={showCrmToast}
+                />
+              )}
 
               {/* TELEGRAM MASS MAILING MODAL */}
               {isMassMailing && (
@@ -6301,7 +5438,7 @@ const handleSaveEditEmployee = async () => {
                     <div className="p-8 pt-0 shrink-0">
                       <button
                         onClick={() => {
-                          alert(`[TELEGRAM MASS DISTRIBUTION STARTED]\n\nШаблон: ${selectedTgTemplateId}\nПолучателей: ${selectedBuyerIds.length}\n\nПроцесс запущен в фоновом режиме через API Telegram Bot. Все пользователи получат персональные сообщения.`);
+                          showCrmToast(`Запущена Telegram-рассылка по ${selectedBuyerIds.length} получателям (шаблон: ${selectedTgTemplateId})`, 'success');
                           setIsMassMailing(false);
                           setSelectedBuyerIds([]);
                         }}
@@ -6327,10 +5464,7 @@ const handleSaveEditEmployee = async () => {
                     </div>
                     
                     <button
-                      onClick={() => {
-                        const modal = document.getElementById('new-task-modal');
-                        if (modal) modal.classList.remove('hidden');
-                      }}
+                      onClick={() => setIsNewTaskModalOpen(true)}
                       className="bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg cursor-pointer"
                     >
                       <Plus className="w-4 h-4" /> Новая задача
@@ -6380,8 +5514,8 @@ const handleSaveEditEmployee = async () => {
                           </div>
                           <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Список задач пуст</p>
                           <button 
-                             onClick={() => document.getElementById('new-task-modal')?.classList.remove('hidden')}
-                             className="text-purple-600 font-black uppercase text-[10px] hover:underline"
+                             onClick={() => setIsNewTaskModalOpen(true)}
+                             className="text-purple-600 font-black uppercase text-[10px] hover:underline cursor-pointer"
                           >
                             Создать первую задачу
                           </button>
@@ -6498,117 +5632,6 @@ const handleSaveEditEmployee = async () => {
                             })}
                         </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* MODAL FOR NEW TASK */}
-                  <div id="new-task-modal" className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-sm hidden">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-stone-200">
-                      <div className="bg-neutral-900 px-6 py-5 flex items-center justify-between text-white">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center text-neutral-950">
-                            <Plus className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-black uppercase tracking-wider">Новая задача</h3>
-                            <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Личный планировщик</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => document.getElementById('new-task-modal')?.classList.add('hidden')}
-                          className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      <div className="p-6 space-y-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase text-neutral-400 tracking-widest block ml-1">Что нужно сделать?</label>
-                          <input 
-                            type="text"
-                            value={newTaskTitle}
-                            onChange={(e) => setNewTaskTitle(e.target.value)}
-                            placeholder="Напр. Перезвонить по объекту на Маяковского"
-                            className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/10 focus:border-purple-500 outline-none font-medium"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-neutral-400 tracking-widest block ml-1">Дедлайн</label>
-                            <input 
-                              type="datetime-local"
-                              value={newTaskDeadline}
-                              onChange={(e) => setNewTaskDeadline(e.target.value)}
-                              className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/10 focus:border-purple-500 outline-none font-medium"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-neutral-400 tracking-widest block ml-1">Приоритет</label>
-                            <select 
-                              value={newTaskPriority}
-                              onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                              className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/10 focus:border-purple-500 outline-none font-medium"
-                            >
-                              <option value="low">Низкий</option>
-                              <option value="medium">Средний</option>
-                              <option value="high">Высокий</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black uppercase text-neutral-400 tracking-widest block ml-1">Связать с клиентом (из базы)</label>
-                          <select 
-                            value={newTaskClientId}
-                            onChange={(e) => setNewTaskClientId(e.target.value)}
-                            className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/10 focus:border-purple-500 outline-none font-medium"
-                          >
-                            <option value="">Без привязки</option>
-                            <optgroup label="Покупатели">
-                              {buyersList.map(b => <option key={b.id} value={b.id}>[Пок] {b.name}</option>)}
-                            </optgroup>
-                            <optgroup label="Заявки (Лиды)">
-                              {leads.map(l => <option key={l.id} value={l.id}>[Лид] {l.name}</option>)}
-                            </optgroup>
-                          </select>
-                        </div>
-
-                        <div className="pt-4">
-                          <button
-                            onClick={() => {
-                              if (!newTaskTitle || !newTaskDeadline) return;
-                              
-                              const client = buyersList.find(b => b.id === newTaskClientId) || leads.find(l => l.id === newTaskClientId);
-                              
-                              const task: CRMTask = {
-                                id: `task-${Date.now()}`,
-                                title: newTaskTitle,
-                                deadline: newTaskDeadline,
-                                priority: newTaskPriority,
-                                status: 'pending',
-                                agentId: loggedInAgent?.id || 'admin',
-                                createdAt: new Date().toISOString(),
-                                clientId: newTaskClientId,
-                                clientName: client?.name
-                              };
-
-                              saveTasks([task, ...tasksList]);
-                              
-                              // Reset and close
-                              setNewTaskTitle('');
-                              setNewTaskDeadline('');
-                              setNewTaskPriority('medium');
-                              setNewTaskClientId('');
-                              document.getElementById('new-task-modal')?.classList.add('hidden');
-                            }}
-                            className="w-full py-4 bg-purple-500 hover:bg-purple-600 text-neutral-950 font-black text-xs rounded-xl transition-all uppercase tracking-widest shadow-xl shadow-purple-500/20 cursor-pointer"
-                          >
-                            Создать задачу
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -7114,7 +6137,7 @@ const handleSaveEditEmployee = async () => {
                         type="button"
                         onClick={() => {
                           if (!newArticleTitle || !newArticleContent) {
-                            alert('Укажите заголовок и напишите текст публикации!');
+                            showCrmToast('Укажите заголовок и текст публикации', 'error');
                             return;
                           }
                           
@@ -7134,7 +6157,7 @@ const handleSaveEditEmployee = async () => {
                               return art;
                             });
                             setArticlesList(updated);
-                            alert(`Публикация «${newArticleTitle}» успешно обновлена!`);
+                            showCrmToast(`Публикация «${newArticleTitle}» обновлена`, 'success');
                             setEditingArticleId(null);
                           } else {
                             const slug = newArticleTitle
@@ -7155,7 +6178,7 @@ const handleSaveEditEmployee = async () => {
                             };
                             const updated = [newArt, ...articlesList];
                             setArticlesList(updated);
-                            alert(`Публикация «${newArticleTitle}» успешно создана и опубликована!`);
+                            showCrmToast(`Публикация «${newArticleTitle}» создана и опубликована`, 'success');
                           }
 
                           setNewArticleTitle('');
@@ -7813,6 +6836,414 @@ const handleSaveEditEmployee = async () => {
             setSellerToPublishModal(null);
           }}
         />
+      )}
+
+      {/* NEW TASK MODAL (Global across CRM) */}
+      {isNewTaskModalOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-stone-200">
+            <div className="bg-neutral-900 px-6 py-5 flex items-center justify-between text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center text-white">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider">Новая задача</h3>
+                  <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">Планировщик CRM</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewTaskModalOpen(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-neutral-500 tracking-widest block ml-1">Что нужно сделать?</label>
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="Напр. Перезвонить покупателю по квартире на Немиге"
+                  className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/15 focus:border-purple-500 outline-none font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-neutral-500 tracking-widest block ml-1">Дедлайн</label>
+                  <input
+                    type="datetime-local"
+                    value={newTaskDeadline}
+                    onChange={(e) => setNewTaskDeadline(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/15 focus:border-purple-500 outline-none font-medium"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-neutral-500 tracking-widest block ml-1">Приоритет</label>
+                  <select
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                    className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/15 focus:border-purple-500 outline-none font-medium cursor-pointer"
+                  >
+                    <option value="low">Низкий</option>
+                    <option value="medium">Средний</option>
+                    <option value="high">Высокий</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-neutral-500 tracking-widest block ml-1">Связать с клиентом</label>
+                <select
+                  value={newTaskClientId}
+                  onChange={(e) => setNewTaskClientId(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 text-neutral-900 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-purple-500/15 focus:border-purple-500 outline-none font-medium cursor-pointer"
+                >
+                  <option value="">Без привязки</option>
+                  <optgroup label="Покупатели">
+                    {buyersList.map(b => <option key={b.id} value={b.id}>[Пок] {b.name}</option>)}
+                  </optgroup>
+                  <optgroup label="Заявки (Лиды)">
+                    {leads.map(l => <option key={l.id} value={l.id}>[Лид] {l.name}</option>)}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="pt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNewTaskModalOpen(false)}
+                  className="px-4 py-3 text-xs font-bold text-stone-500 hover:text-stone-900 cursor-pointer"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newTaskTitle.trim()) {
+                      showCrmToast('Укажите текст задачи', 'error');
+                      return;
+                    }
+                    const effectiveDeadline = newTaskDeadline || new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+                    const client = buyersList.find(b => b.id === newTaskClientId) || leads.find(l => l.id === newTaskClientId);
+                    const task: CRMTask = {
+                      id: `task-${Date.now()}`,
+                      title: newTaskTitle.trim(),
+                      deadline: effectiveDeadline,
+                      priority: newTaskPriority,
+                      status: 'pending',
+                      agentId: loggedInAgent?.id || 'admin',
+                      assignedAgentName: loggedInAgent?.name,
+                      createdAt: new Date().toISOString(),
+                      clientId: newTaskClientId || undefined,
+                      clientName: client?.name,
+                    };
+                    saveTasks([task, ...tasksList]);
+                    setNewTaskTitle('');
+                    setNewTaskDeadline('');
+                    setNewTaskPriority('medium');
+                    setNewTaskClientId('');
+                    setIsNewTaskModalOpen(false);
+                    showCrmToast('Задача добавлена в планер', 'success');
+                  }}
+                  className="flex-1 py-3.5 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-black text-xs rounded-xl transition-all uppercase tracking-widest shadow-md cursor-pointer"
+                >
+                  Создать задачу
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD / EDIT PROPERTY MODAL */}
+      {editingPropertyModal && (
+        <div className="fixed inset-0 z-[135] flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-stone-200 my-8">
+            <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-stone-900 uppercase tracking-tight">
+                  {editingPropertyModal.mode === 'create' ? 'Добавить объект в CRM' : 'Редактирование объекта'}
+                </h3>
+                <p className="text-[11px] text-stone-500">Заполните основные характеристики и статус договора</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingPropertyModal(null)}
+                className="p-2 text-stone-400 hover:text-stone-800 rounded-xl hover:bg-stone-200/60 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Название / Заголовок *</label>
+                  <input
+                    type="text"
+                    placeholder="Например: 2-комн. квартира у метро Грушевка"
+                    value={editingPropertyModal.title}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, title: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Тип объекта</label>
+                  <select
+                    value={editingPropertyModal.type}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, type: e.target.value as Property['type'] })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-semibold outline-none cursor-pointer"
+                  >
+                    <option value="apartment">Квартира</option>
+                    <option value="house">Дом / Коттедж</option>
+                    <option value="commercial">Коммерция</option>
+                    <option value="plot">Участок</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">
+                    Цена (USD) {editingPropertyModal.priceUSD ? `≈ ${Math.round((parseFloat(editingPropertyModal.priceUSD) || 0) * nbrbRate).toLocaleString('ru-RU')} BYN` : ''}
+                  </label>
+                  <input
+                    type="number"
+                    value={editingPropertyModal.priceUSD}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, priceUSD: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Адрес *</label>
+                  <input
+                    type="text"
+                    value={editingPropertyModal.address}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, address: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Район</label>
+                  <input
+                    type="text"
+                    placeholder="Московский"
+                    value={editingPropertyModal.district}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, district: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-semibold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Площадь (м²)</label>
+                  <input
+                    type="number"
+                    value={editingPropertyModal.area}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, area: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Комнат</label>
+                  <input
+                    type="number"
+                    value={editingPropertyModal.rooms}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, rooms: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-stone-500">Этаж</label>
+                    <input
+                      type="number"
+                      value={editingPropertyModal.floor}
+                      onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, floor: e.target.value })}
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-stone-500">Этажей</label>
+                    <input
+                      type="number"
+                      value={editingPropertyModal.totalFloors}
+                      onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, totalFloors: e.target.value })}
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold outline-none focus:bg-white focus:border-[#8B5CF6]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Статус договора</label>
+                  <select
+                    value={editingPropertyModal.contractStatus}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, contractStatus: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-semibold outline-none cursor-pointer"
+                  >
+                    <option value="draft">Без договора (Черновик)</option>
+                    <option value="signed">Договор подписан</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 w-full">
+                    <input
+                      type="checkbox"
+                      checked={editingPropertyModal.isPublished}
+                      onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, isPublished: e.target.checked })}
+                      className="w-4 h-4 text-[#8B5CF6] rounded border-stone-300"
+                    />
+                    <span className="font-bold text-stone-800">Опубликовать в каталоге</span>
+                  </label>
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Ссылка на фото</label>
+                  <input
+                    type="text"
+                    value={editingPropertyModal.photo}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, photo: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-medium outline-none focus:bg-white focus:border-[#8B5CF6]"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-stone-500">Описание</label>
+                  <textarea
+                    rows={3}
+                    value={editingPropertyModal.description}
+                    onChange={(e) => setEditingPropertyModal({ ...editingPropertyModal, description: e.target.value })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-medium outline-none focus:bg-white focus:border-[#8B5CF6] resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-stone-50 border-t border-stone-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingPropertyModal(null)}
+                className="px-4 py-2 text-xs font-bold text-stone-500 hover:text-stone-900 cursor-pointer"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!editingPropertyModal.title.trim() || !editingPropertyModal.address.trim()) {
+                    showCrmToast('Заполните название и адрес объекта', 'error');
+                    return;
+                  }
+                  const priceUSD = parseFloat(editingPropertyModal.priceUSD) || 0;
+                  const priceBYN = Math.round(priceUSD * (nbrbRate || 3.27));
+                  const area = parseFloat(editingPropertyModal.area) || 0;
+                  const rooms = editingPropertyModal.rooms ? parseInt(editingPropertyModal.rooms, 10) : undefined;
+                  const floor = editingPropertyModal.floor ? parseInt(editingPropertyModal.floor, 10) : undefined;
+                  const totalFloors = editingPropertyModal.totalFloors ? parseInt(editingPropertyModal.totalFloors, 10) : undefined;
+                  const photoUrl = editingPropertyModal.photo.trim() || '/photo/hero-apartment.jpg';
+
+                  if (editingPropertyModal.mode === 'edit' && editingPropertyModal.id) {
+                    const updated = propertiesList.map((p) =>
+                      p.id === editingPropertyModal.id
+                        ? {
+                            ...p,
+                            title: editingPropertyModal.title.trim(),
+                            type: editingPropertyModal.type,
+                            address: editingPropertyModal.address.trim(),
+                            district: editingPropertyModal.district.trim() || p.district,
+                            rooms,
+                            area,
+                            floor,
+                            totalFloors,
+                            priceUSD,
+                            priceBYN,
+                            contractStatus: editingPropertyModal.contractStatus,
+                            isPublished: editingPropertyModal.isPublished,
+                            isClosedBase: !editingPropertyModal.isPublished,
+                            photo: photoUrl,
+                            image: photoUrl,
+                            description: editingPropertyModal.description.trim(),
+                          }
+                        : p
+                    );
+                    setPropertiesList(updated);
+                    showCrmToast(`Объект «${editingPropertyModal.title.trim()}» обновлён`, 'success');
+                  } else {
+                    const newProp: Property = {
+                      id: `prop-${Date.now()}`,
+                      title: editingPropertyModal.title.trim(),
+                      type: editingPropertyModal.type,
+                      address: editingPropertyModal.address.trim(),
+                      district: editingPropertyModal.district.trim() || undefined,
+                      rooms,
+                      area,
+                      floor,
+                      totalFloors,
+                      priceUSD,
+                      priceBYN,
+                      photo: photoUrl,
+                      image: photoUrl,
+                      features: [],
+                      assignedAgentId: loggedInAgent?.id,
+                      assignedAgentName: loggedInAgent?.name,
+                      agentName: loggedInAgent?.name,
+                      agentPhone: loggedInAgent?.phone,
+                      contractStatus: editingPropertyModal.contractStatus,
+                      isPublished: editingPropertyModal.isPublished,
+                      isClosedBase: !editingPropertyModal.isPublished,
+                      crmOnly: !editingPropertyModal.isPublished,
+                      description: editingPropertyModal.description.trim(),
+                    };
+                    setPropertiesList([newProp, ...propertiesList]);
+                    showCrmToast(`Объект «${newProp.title}» добавлен в CRM`, 'success');
+                  }
+                  setEditingPropertyModal(null);
+                }}
+                className="px-5 py-2.5 bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                {editingPropertyModal.mode === 'create' ? 'Создать объект' : 'Сохранить изменения'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CRM NON-BLOCKING TOAST NOTIFICATION */}
+      {crmToast && (
+        <div
+          className={`fixed bottom-5 right-5 z-[160] max-w-sm px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-3 text-xs font-bold animate-fade-in ${
+            crmToast.variant === 'success'
+              ? 'bg-emerald-950 text-emerald-50 border-emerald-700'
+              : crmToast.variant === 'error'
+                ? 'bg-rose-950 text-rose-50 border-rose-700'
+                : 'bg-stone-900 text-white border-stone-700'
+          }`}
+        >
+          {crmToast.variant === 'success' ? (
+            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : crmToast.variant === 'error' ? (
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+          )}
+          <span className="flex-1 leading-snug">{crmToast.message}</span>
+          <button
+            type="button"
+            onClick={() => setCrmToast(null)}
+            className="text-white/60 hover:text-white cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ interface MyDraftPropertiesTabProps {
   properties: Property[];
   onDelete: (id: string) => void;
   onEdit: (prop: Property) => void;
+  onCreateManual?: () => void;
   onPublish: (id: string) => void;
   onGenerateRequest: (prop: Property) => void;
   onOpenImporter: () => void;
@@ -22,6 +23,7 @@ export default function MyDraftPropertiesTab({
   properties, 
   onDelete, 
   onEdit, 
+  onCreateManual,
   onPublish, 
   onGenerateRequest,
   onOpenImporter,
@@ -29,12 +31,27 @@ export default function MyDraftPropertiesTab({
 }: MyDraftPropertiesTabProps) {
   const [filter, setFilter] = useState<'all' | 'no_contract' | 'signed' | 'published'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const isAdminUser = Boolean(
+    loggedInAgent && (
+      loggedInAgent.id === 'admin' ||
+      loggedInAgent.isAdmin === true ||
+      loggedInAgent.role?.toLowerCase().includes('администратор') ||
+      loggedInAgent.role?.toLowerCase().includes('директор')
+    )
+  );
+  const ownPropertiesCount = properties.filter(p => p.assignedAgentId === loggedInAgent?.id).length;
+  const [scopeMode, setScopeMode] = useState<'mine' | 'all'>(() =>
+    isAdminUser && ownPropertiesCount === 0 ? 'all' : 'mine'
+  );
 
-  const myProperties = properties.filter(p => p.assignedAgentId === loggedInAgent?.id);
+  const myProperties = (isAdminUser && scopeMode === 'all')
+    ? properties
+    : properties.filter(p => p.assignedAgentId === loggedInAgent?.id);
 
   const filteredProperties = myProperties.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.address.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (p.address || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     if (filter === 'no_contract') return matchesSearch && p.contractStatus !== 'signed' && !p.isPublished;
     if (filter === 'signed') return matchesSearch && p.contractStatus === 'signed' && !p.isPublished;
@@ -50,18 +67,45 @@ export default function MyDraftPropertiesTab({
           <h2 className="text-2xl font-black text-stone-900 uppercase tracking-tight flex items-center gap-3">
             📦 Мои объекты <span className="text-stone-400 font-medium">/ Черновики CRM</span>
           </h2>
-          <p className="text-sm font-medium text-stone-500 mt-1">Здесь хранятся ваши черновики, объекты в работе и те, что ещё не опубликованы на сайте.</p>
+          <p className="text-sm font-medium text-stone-500 mt-1">Здесь хранятся черновики, объекты в работе и те, что ещё не опубликованы на сайте.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {isAdminUser && (
+            <div className="inline-flex p-1 bg-stone-100 border border-stone-200 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setScopeMode('mine')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                  scopeMode === 'mine' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-900'
+                }`}
+              >
+                Мои ({ownPropertiesCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setScopeMode('all')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                  scopeMode === 'all' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-900'
+                }`}
+              >
+                Все ({properties.length})
+              </button>
+            </div>
+          )}
           <button 
+            type="button"
             onClick={onOpenImporter}
-            className="px-5 py-3 bg-stone-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-stone-800 transition-all shadow-lg shadow-stone-200 flex items-center gap-2.5"
+            className="px-4 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-stone-800 transition-all shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
             Распознать с Realt.by
           </button>
-          <button className="px-5 py-3 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => onCreateManual?.()}
+            className="px-4 py-2.5 bg-[#8B5CF6] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#7C3AED] transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
             <Plus className="w-4 h-4" />
             Добавить вручную
           </button>
@@ -69,7 +113,7 @@ export default function MyDraftPropertiesTab({
       </div>
 
       {/* Filters & Search */}
-      <div className="bg-white p-2 rounded-2xl border border-stone-100 shadow-sm flex flex-col md:flex-row gap-2">
+      <div className="bg-white p-2 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col md:flex-row gap-2">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input 
@@ -90,15 +134,16 @@ export default function MyDraftPropertiesTab({
           ].map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setFilter(tab.id as any)}
-              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
                 filter === tab.id 
                   ? 'bg-white text-stone-900 shadow-sm' 
                   : 'text-stone-500 hover:text-stone-700'
               }`}
             >
               {tab.label}
-              <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${filter === tab.id ? 'bg-stone-900 text-white' : 'bg-stone-200 text-stone-600'}`}>
+              <span className={`px-1.5 py-0.5 rounded-md text-[9px] tabular-nums ${filter === tab.id ? 'bg-stone-900 text-white' : 'bg-stone-200 text-stone-600'}`}>
                 {tab.count}
               </span>
             </button>
@@ -113,19 +158,20 @@ export default function MyDraftPropertiesTab({
             <motion.div
               layout
               key={prop.id}
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden group hover:shadow-xl hover:border-purple-100 transition-all"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white rounded-2xl border border-stone-200/80 shadow-xs overflow-hidden group hover:shadow-lg hover:border-purple-200 transition-all"
             >
               <div className="relative aspect-video overflow-hidden bg-stone-100">
                 <img 
-                  src={prop.photo || prop.image || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80'} 
+                  src={prop.photo || prop.image || '/photo/hero-apartment.jpg'} 
                   alt={prop.title} 
+                  referrerPolicy="no-referrer"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80';
+                    (e.target as HTMLImageElement).src = '/photo/hero-apartment.jpg';
                   }}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                 />
                 
                 {/* Status Badges */}
@@ -152,21 +198,47 @@ export default function MyDraftPropertiesTab({
                   )}
                 </div>
 
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                  <div className="flex gap-2 w-full">
-                    <button 
-                      onClick={() => onEdit(prop)}
-                      className="flex-1 py-2 bg-white/20 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-white hover:text-stone-900 transition-all border border-white/30"
-                    >
-                      Редактировать
-                    </button>
-                    <button 
-                      onClick={() => onDelete(prop.id)}
-                      className="p-2 bg-red-500/20 backdrop-blur-md text-red-100 rounded-lg hover:bg-red-500 transition-all border border-red-500/30"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-900/75 via-stone-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                  {confirmDeleteId === prop.id ? (
+                    <div className="flex items-center gap-2 w-full bg-white/95 backdrop-blur-md p-2 rounded-xl">
+                      <span className="text-[10px] font-bold text-rose-700 flex-1 pl-1">Удалить объект?</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDelete(prop.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="px-2.5 py-1 bg-rose-600 text-white rounded-lg text-[10px] font-bold cursor-pointer"
+                      >
+                        Да
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2.5 py-1 bg-stone-200 text-stone-700 rounded-lg text-[10px] font-bold cursor-pointer"
+                      >
+                        Нет
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 w-full">
+                      <button 
+                        type="button"
+                        onClick={() => onEdit(prop)}
+                        className="flex-1 py-2 bg-white/90 text-stone-900 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-white transition-all cursor-pointer"
+                      >
+                        Редактировать
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setConfirmDeleteId(prop.id)}
+                        className="p-2 bg-rose-600/90 text-white rounded-lg hover:bg-rose-600 transition-all cursor-pointer"
+                        title="Удалить объект"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
