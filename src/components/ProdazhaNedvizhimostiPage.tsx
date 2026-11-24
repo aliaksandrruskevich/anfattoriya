@@ -9,24 +9,31 @@ import {
   TrendingUp, Users, CheckCircle, HelpCircle, BadgeCheck,
   Send, MessageCircle, MapPin
 } from 'lucide-react';
-import { PageId } from '../types';
+import type { Agent, PageId, Property } from '../types';
+import { isRealtorAgent } from '@/lib/agentUtils';
+import { getAgentUrl } from '@/lib/routes';
+import { AgentBrandAvatar } from './AgentBrandAvatar';
+import ActiveSalePropertiesSection from './ActiveSalePropertiesSection';
 
 interface ProdazhaNedvizhimostiPageProps {
   activePage?: PageId;
   navigateTo: (pageId: PageId) => void;
   handleAddLead: (name: string, phone: string, extra: string, source: string) => void;
+  properties?: Property[];
+  agents?: Agent[];
 }
 
 const displayFont = "'Cormorant Garamond', 'Georgia', serif";
 const bodyFont = "'Raleway', system-ui, sans-serif";
 const borderLine = '#E7E2DA';
 
-const HERO_PHOTO = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=1920';
+const HERO_PHOTO = '/photo/hero-building.jpg';
 
 const TOC_ITEMS = [
+  { id: 'active-objects', label: 'Актуальные объекты в продаже' },
   { id: 'directions', label: 'Направления продаж' },
   { id: 'experience', label: 'Опыт «Фаттории» с 2022 года' },
-  { id: 'analytics', label: 'Аналитика и цены 2022–2026' },
+  { id: 'analytics', label: 'Аналитика и оценка цены' },
   { id: 'roadmap', label: '9 этапов сделки под ключ' },
   { id: 'marketing', label: 'Маркетинг и фотосъемка' },
   { id: 'safety', label: 'Юридические гарантии' },
@@ -34,12 +41,19 @@ const TOC_ITEMS = [
   { id: 'faq', label: 'Частые вопросы продавцов' },
 ];
 
-export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }: ProdazhaNedvizhimostiPageProps) {
-  const [activeId, setActiveId] = useState<string>('directions');
+export default function ProdazhaNedvizhimostiPage({
+  navigateTo,
+  handleAddLead,
+  properties = [],
+  agents = [],
+}: ProdazhaNedvizhimostiPageProps) {
+  const [activeId, setActiveId] = useState<string>('active-objects');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [leadSent, setLeadSent] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  const featuredRealtor = agents.filter(isRealtorAgent)[0];
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -92,32 +106,32 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
     {
       title: 'Продажа квартир в Минске',
       slug: 'prodazha-kvartiry',
-      desc: 'Вторичный фонд, улучшенные планировки, сталинки в центре и новые ЖК (Минск-Мир, Новая Боровая, Левада, D3). От хоум-стейджинга до получения расчетных документов в БТИ.',
-      photo: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=800',
+      desc: 'Вторичный фонд, улучшенные планировки, сталинки в центре и современные жилые комплексы (Минск-Мир, Новая Боровая, Левада, D3). От подготовки к показу до регистрации в БТИ.',
+      photo: '/photo/hero-apartment.jpg',
       badge: 'Средний срок — 26 дней',
       features: ['Глубокая проверка истории приватизации', 'Профессиональный фотосет без искажений', 'Альтернативные цепочки любой длины']
     },
     {
       title: 'Загородные дома, коттеджи и дачи',
       slug: 'prodazha-doma-dachi',
-      desc: 'Престижные пригороды (Дроздово, Ратомка, Колодищи, Тарасово), дачные товарищества и участки под ИЖС. Аудит земельных границ, коммуникаций и консервации.',
-      photo: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=800',
-      badge: 'Съемка 4K ',
-      features: ['Сверка фактических границ по кадастру', 'Проверка техпаспорта и ввода коммуникаций', 'Презентация экологического окружения']
+      desc: 'Минский район и область: коттеджи, дома для круглогодичного проживания, дачи и земельные участки. Аудит земельных границ, коммуникаций и документов.',
+      photo: '/photo/hero-house.jpg',
+      badge: 'Полный аудит участка',
+      features: ['Сверка фактических границ по кадастру', 'Проверка техпаспорта и ввода коммуникаций', 'Презентация расположения и подъездных путей']
     },
     {
       title: 'Коммерческая недвижимость',
       slug: 'prodazha-pomescheniya',
-      desc: 'Street retail, офисные этажи, склады, производственные базы и готовый арендный бизнес с подтвержденной доходностью (Cap Rate от 9% годовых).',
-      photo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800',
-      badge: 'Пул проверенных инвесторов',
-      features: ['Финансовый аудит арендного потока', 'Инвестиционный меморандум для банков', 'Безналичные расчеты и налоговый аудит']
+      desc: 'Street retail, офисные помещения, склады, производственные базы и объекты с арендаторами.',
+      photo: '/photo/hero-office.jpg',
+      badge: 'Прямой подбор покупателей',
+      features: ['Проверка правоустанавливающих документов', 'Подготовка презентации для покупателей', 'Безналичные расчёты и сопровождение сделки']
     },
     {
       title: 'Комнаты и доли в квартирах',
       slug: 'prodazha-komnaty-doli',
       desc: 'Безукоризненное соблюдение ст. 253 Гражданского кодекса РБ. Нотариальные извещения сособственников, отказы, определение порядка пользования комнатами.',
-      photo: 'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&q=80&w=800',
+      photo: '/photo/hero-interior.jpg',
       badge: 'Юридическая безупречность',
       features: ['Досудебное урегулирование споров', 'Официальные почтовые и нотариальные вызовы', 'Снятие рисков оспаривания сделки']
     }
@@ -328,13 +342,28 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             </div>
           </aside>
 
-          {/* Центральная колонка: Полноценные редакционные материалы */}
+          {/* Центральная колонка: Актуальные объекты + Редакционные материалы */}
           <main className="order-2 min-w-0 max-w-[880px] space-y-16">
-            
-            {/* 01: НАПРАВЛЕНИЯ ПРОДАЖ */}
-            <section id="directions" className="scroll-mt-32">
+
+            <ActiveSalePropertiesSection
+              id="active-objects"
+              sectionNumber="01"
+              eyebrow="Актуальные предложения с Realt.by"
+              title="Действующие объекты недвижимости в продаже"
+              subtitle="Все действующие объявления агентства АН «Фаттория» на продажу с актуальными ценами и ответственными риэлтерами."
+              category="all"
+              showCategoryTabs={true}
+              properties={properties}
+              agents={agents}
+              onRequestConsultation={() =>
+                document.getElementById('lead-form')?.scrollIntoView({ behavior: 'smooth' })
+              }
+            />
+
+            {/* 02: НАПРАВЛЕНИЯ ПРОДАЖ */}
+            <section id="directions" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                01 · Специализация
+                02 · Специализация
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -411,7 +440,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 02: ОПЫТ АН ФАТТОРИЯ С 2022 ГОДА */}
             <section id="experience" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                02 · Практика и доверие
+                03 · Практика и доверие
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -468,7 +497,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 03: АНАЛИТИКА РЫНКА */}
             <section id="analytics" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                03 · Аналитический подход
+                04 · Аналитический подход
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -483,13 +512,13 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
               {/* Фото вставки высокого качества с подписью */}
               <div className="my-8 rounded-3xl overflow-hidden border border-stone-200 shadow-md">
                 <img
-                  src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=1600"
-                  alt="Интерьер премиальной квартиры в Минске"
+                  src="/photo/hero-flat.jpg"
+                  alt="Анализ и подготовка недвижимости к продаже в Минске"
                   className="w-full h-80 object-cover"
                 />
                 <div className="p-4 bg-stone-50 text-xs text-stone-500 flex items-center justify-between border-t border-stone-200">
-                  <span>Реальный объект, проданный экспертами АН «Фаттория» в жилом комплексе «Левада»</span>
-                  <span className="font-semibold text-stone-700">Срок продажи: 18 дней</span>
+                  <span>Анализ сопоставимых сделок и конкурентного окружения на рынке Минска</span>
+                  <span className="font-semibold text-stone-700">Средний срок — 26 дней</span>
                 </div>
               </div>
 
@@ -510,7 +539,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 04: 9 ЭТАПОВ СДЕЛКИ */}
             <section id="roadmap" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                04 · Регламент работы
+                05 · Регламент работы
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -547,7 +576,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 05: МАРКЕТИНГ И ФОТОСЪЕМКА */}
             <section id="marketing" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                05 · Визуальный продакшн
+                06 · Визуальный продакшн
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -562,25 +591,25 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 my-6">
                 <div className="rounded-2xl overflow-hidden border border-stone-200 shadow-sm">
                   <img
-                    src="https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&q=80&w=800"
+                    src="/photo/hero-interior.jpg"
                     alt="Естественный свет в интерьере"
                     className="w-full h-52 object-cover"
                   />
                   <div className="p-4 bg-stone-50">
                     <h5 className="font-semibold text-stone-900 text-sm mb-1">Световые сценарии</h5>
-                    <p className="text-xs text-stone-600 leading-relaxed font-light">Съемка в «золотой час» раскрывает объемы и планировочные достоинства жилья.</p>
+                    <p className="text-xs text-stone-600 leading-relaxed font-light">Грамотная съёмка раскрывает объемы и планировочные достоинства жилья.</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl overflow-hidden border border-stone-200 shadow-sm">
                   <img
-                    src="https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=800"
-                    alt="Детали и сервировка интерьера"
+                    src="/photo/hero-apartment.jpg"
+                    alt="Подготовка интерьера к показам"
                     className="w-full h-52 object-cover"
                   />
                   <div className="p-4 bg-stone-50">
                     <h5 className="font-semibold text-stone-900 text-sm mb-1">Интерьерный стайлинг</h5>
-                    <p className="text-xs text-stone-600 leading-relaxed font-light">Аккуратные детали и живые растения создают ощущение ухоженного, дорогого дома.</p>
+                    <p className="text-xs text-stone-600 leading-relaxed font-light">Аккуратное пространство без визуального шума формирует доверие покупателя.</p>
                   </div>
                 </div>
               </div>
@@ -589,7 +618,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 06: ЮРИДИЧЕСКИЕ ГАРАНТИИ И ТАРИФЫ */}
             <section id="safety" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                06 · Безопасность
+                07 · Безопасность
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -619,7 +648,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 07: ТАРИФЫ МИНЮСТА */}
             <section id="tariffs" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                07 · Стоимость услуг
+                08 · Стоимость услуг
               </div>
               <h2
                 className="text-stone-900 mb-4 font-normal tracking-tight"
@@ -674,7 +703,7 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* 08: FAQ */}
             <section id="faq" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                08 · Ответы на вопросы
+                09 · Ответы на вопросы
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -834,16 +863,25 @@ export default function ProdazhaNedvizhimostiPage({ navigateTo, handleAddLead }:
             {/* Карточка дежурного специалиста */}
             <div className="p-6 bg-stone-50 rounded-3xl border border-stone-200">
               <div className="flex items-center gap-3.5 mb-4">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
-                  <img
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=200"
-                    alt="Ведущий риэлтер"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div>
-                  <div className="font-semibold text-stone-900 text-sm">Дежурный специалист</div>
-                  <div className="text-[11px] text-stone-500">Отдел продаж АН «Фаттория»</div>
+                <AgentBrandAvatar
+                  photo={featuredRealtor?.photo || '/photo/fedorchuk.jpg'}
+                  name={featuredRealtor?.name || 'Специалист АН «Фаттория»'}
+                  className="w-12 h-12 rounded-full object-cover shrink-0 border border-stone-300"
+                />
+                <div className="min-w-0">
+                  {featuredRealtor ? (
+                    <Link
+                      href={getAgentUrl(featuredRealtor)}
+                      className="font-semibold text-stone-900 text-sm hover:text-amber-800 transition-colors block truncate"
+                    >
+                      {featuredRealtor.name}
+                    </Link>
+                  ) : (
+                    <div className="font-semibold text-stone-900 text-sm">Дежурный специалист</div>
+                  )}
+                  <div className="text-[11px] text-stone-500 truncate">
+                    {featuredRealtor?.role || 'Отдел продаж АН «Фаттория»'}
+                  </div>
                 </div>
               </div>
               <p className="text-xs text-stone-600 mb-4 font-light leading-relaxed">

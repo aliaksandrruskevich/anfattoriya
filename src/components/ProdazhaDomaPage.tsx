@@ -7,20 +7,24 @@ import {
   Compass, MapPin, Trees, SunMedium, Camera, Eye,
   Check, Star, Calendar, Share2, Bookmark, Send, MessageCircle, CheckCircle
 } from 'lucide-react';
-import { PageId } from '../types';
+import type { Agent, PageId, Property } from '../types';
+import ActiveSalePropertiesSection from './ActiveSalePropertiesSection';
 
 interface ProdazhaDomaPageProps {
   activePage?: PageId;
   navigateTo: (pageId: PageId) => void;
   handleAddLead: (name: string, phone: string, extra: string, source: string) => void;
+  properties?: Property[];
+  agents?: Agent[];
 }
 
 const displayFont = "'Cormorant Garamond', 'Georgia', serif";
 const bodyFont = "'Raleway', system-ui, sans-serif";
 
-const HERO_PHOTO = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=1920';
+const HERO_PHOTO = '/photo/hero-house.jpg';
 
 const TOC_ITEMS = [
+  { id: 'active-objects', label: 'Актуальные дома и участки в продаже' },
   { id: 'categories', label: 'Категории загородных объектов' },
   { id: 'experience', label: 'Опыт «Фаттории» с 2022 года' },
   { id: 'audit', label: 'Земельный и технический аудит' },
@@ -29,8 +33,13 @@ const TOC_ITEMS = [
   { id: 'faq', label: 'Частые вопросы продавцов' },
 ];
 
-export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: ProdazhaDomaPageProps) {
-  const [activeId, setActiveId] = useState<string>('categories');
+export default function ProdazhaDomaPage({
+  navigateTo,
+  handleAddLead,
+  properties = [],
+  agents = [],
+}: ProdazhaDomaPageProps) {
+  const [activeId, setActiveId] = useState<string>('active-objects');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [leadSent, setLeadSent] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -84,28 +93,28 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
 
   const houseCategories = [
     {
-      title: 'Коттеджи и усадьбы премиум-класса',
-      desc: 'Престижные локации: Дроздово, Цна, Колодищи, Тарасово, Ратомка, Заславль. Полный аудит ввода в эксплуатацию, системы «умный дом», газовых ТУ и ландшафта.',
-      photo: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800',
-      tag: 'Престижные локации Минского района'
+      title: 'Коттеджи и усадьбы',
+      desc: 'Минский район и область: Дроздово, Цна, Колодищи, Тарасово, Ратомка, Заславль. Аудит ввода в эксплуатацию, инженерных сетей, газовых ТУ и документов на участок.',
+      photo: '/photo/hero-cottage.jpg',
+      tag: 'Локации Минского района'
     },
     {
       title: 'Дачи в садовых товариществах (СТ)',
-      desc: 'Сезонные и круглогодичные дома в СТ. Проверка устава товарищества, членских взносов, границ по кадастру, мощности трансформатора и летнего/зимнего водопровода.',
-      photo: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=800',
+      desc: 'Сезонные и круглогодичные дома в СТ. Проверка устава товарищества, членских взносов, границ по кадастру, мощности электросети и водоснабжения.',
+      photo: '/photo/dom.jpg',
       tag: 'СТ и дачные массивы'
     },
     {
       title: 'Земельные участки под ИЖС',
       desc: 'Участки для строительства и обслуживания жилого дома. Проверка правового статуса (частная собственность, ПНВ, аренда), охранных зон ЛЭП и газопроводов.',
-      photo: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=800',
+      photo: '/photo/hero-land.jpg',
       tag: 'Юридический статус земли'
     },
     {
       title: 'Таунхаусы и блокированные дома',
-      desc: 'Современный загородный формат с небольшим участком. Проверка выделения долей в натуре, порядка пользования общими территориями и коммуникациями.',
-      photo: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800',
-      tag: 'Комфорт и безопасность'
+      desc: 'Современный загородный формат с собственным участком. Проверка выделения долей, порядка пользования придомовой территорией и коммуникациями.',
+      photo: '/photo/hero-house.jpg',
+      tag: 'Блокированная застройка'
     }
   ];
 
@@ -135,7 +144,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
     },
     {
       q: 'В какое время года выгоднее продавать дом или дачу?',
-      a: 'Пик спроса на дачи и загородные дома традиционно начинается в марте и длится до середины июля, а второй всплеск наблюдается в сентябре-октябре. Однако правильно подготовленный дом с качественным зимним отоплением и профессиональной фотосъемкой продается круглый год. С 2022 года мы успешно закрыли десятки загородных сделок даже в декабре и январе.'
+      a: 'Активный спрос на дачи и загородные дома традиционно приходится на весенне-летний период и начало осени. Однако подготовленный дом с отоплением, полным пакетом документов и качественной фотосъёмкой находит покупателя в любой сезон года.'
     },
     {
       q: 'Какова комиссия агентства при продаже загородной недвижимости?',
@@ -183,7 +192,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
               className="text-[17px] lg:text-[21px] font-light leading-relaxed max-w-3xl mb-8 text-white/90"
               style={{ textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}
             >
-              Аудит земельного статуса, коммуникаций и строений. С 2022 года в нашем портфеле — десятки проданных усадеб без юридических претензий.
+              Аудит земельного статуса, коммуникаций и строений. Проводим полную предпродажную подготовку и сопровождение сделок с загородной недвижимостью с 2022 года.
             </p>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
@@ -262,10 +271,24 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
           {/* Центральная колонка */}
           <main className="order-2 min-w-0 max-w-[880px] space-y-16">
 
-            {/* 01: КАТЕГОРИИ */}
-            <section id="categories" className="scroll-mt-32">
+            <ActiveSalePropertiesSection
+              id="active-objects"
+              sectionNumber="01"
+              eyebrow="Загородные объекты с Realt.by"
+              title="Действующие дома, коттеджи, дачи и участки в продаже"
+              subtitle="Все действующие предложения загородной недвижимости и земельных участков агентства АН «Фаттория» на продажу."
+              category="house_plot"
+              properties={properties}
+              agents={agents}
+              onRequestConsultation={() =>
+                document.getElementById('lead-form')?.scrollIntoView({ behavior: 'smooth' })
+              }
+            />
+
+            {/* 02: КАТЕГОРИИ */}
+            <section id="categories" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                01 · Классификация загородных объектов
+                02 · Классификация загородных объектов
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -321,7 +344,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
             {/* 02: ОПЫТ ФАТТОРИИ С 2022 ГОДА */}
             <section id="experience" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                02 · Практика
+                03 · Практика
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -342,7 +365,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
             {/* 03: АУДИТ */}
             <section id="audit" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                03 · Предпродажная проверка
+                04 · Предпродажная проверка
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -377,7 +400,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
             {/* 04: АЭРОСЪЕМКА */}
             <section id="drone" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                04 · Продвижение
+                05 · Продвижение
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -390,7 +413,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
                   С земли невозможно оценить прелесть загородного участка: близость соснового бора, водохранилища или удобный выезд на скоростную трассу. Профессиональный дрон поднимается на высоту птичьего полета и показывает объект в окружении природы.
                 </p>
                 <p>
-                  Объявления с качественным видеороликом с квадрокоптера получают в 3.8 раза больше откликов и сохранений в закладки, привлекая мотивированных состоятельных покупателей из Минска и других городов.
+                  Качественные фотографии участка, дома и подъездных путей наглядно демонстрируют достоинства объекта покупателям из Минска и других городов ещё до выезда на просмотр.
                 </p>
               </div>
             </section>
@@ -398,7 +421,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
             {/* 05: ДОКУМЕНТЫ */}
             <section id="documents" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                05 · Пакет документов
+                06 · Пакет документов
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -434,7 +457,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
             {/* 06: СЕЗОННОСТЬ */}
             <section id="seasonality" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                06 · Маркетинговая стратегия
+                07 · Маркетинговая стратегия
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -455,7 +478,7 @@ export default function ProdazhaDomaPage({ navigateTo, handleAddLead }: Prodazha
             {/* 07: FAQ */}
             <section id="faq" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                07 · Часто задаваемые вопросы
+                08 · Часто задаваемые вопросы
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"

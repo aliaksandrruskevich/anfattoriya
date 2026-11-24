@@ -7,28 +7,37 @@ import {
   TrendingUp, BarChart3, Calculator, Scale, Sparkles,
   Calendar, Share2, Bookmark, CheckCircle, Send, MessageCircle
 } from 'lucide-react';
-import { PageId } from '../types';
+import type { Agent, PageId, Property } from '../types';
+import ActiveSalePropertiesSection from './ActiveSalePropertiesSection';
 
 interface ProdazhaPomescheniyaPageProps {
   activePage?: PageId;
   navigateTo: (pageId: PageId) => void;
   handleAddLead: (name: string, phone: string, extra: string, source: string) => void;
+  properties?: Property[];
+  agents?: Agent[];
 }
 
 const displayFont = "'Cormorant Garamond', 'Georgia', serif";
 const bodyFont = "'Raleway', system-ui, sans-serif";
 
-const HERO_PHOTO = 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=1920';
+const HERO_PHOTO = '/photo/hero-office.jpg';
 
 const TOC_ITEMS = [
+  { id: 'active-objects', label: 'Актуальные помещения в продаже' },
   { id: 'segments', label: 'Сегменты коммерции' },
   { id: 'experience', label: 'Опыт «Фаттории» с 2022 года' },
-  { id: 'investors', label: 'Пул институциональных инвесторов' },
+  { id: 'investors', label: 'Подбор целевых покупателей' },
   { id: 'faq', label: 'Частые вопросы продавцов' },
 ];
 
-export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: ProdazhaPomescheniyaPageProps) {
-  const [activeId, setActiveId] = useState<string>('segments');
+export default function ProdazhaPomescheniyaPage({
+  navigateTo,
+  handleAddLead,
+  properties = [],
+  agents = [],
+}: ProdazhaPomescheniyaPageProps) {
+  const [activeId, setActiveId] = useState<string>('active-objects');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [leadSent, setLeadSent] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -83,27 +92,27 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
   const commercialSegments = [
     {
       title: 'Street Retail (Торговые помещения)',
-      desc: 'Первые линии центральных проспектов и спальных массивов с высоким пешеходным трафиком. Помещения под банки, аптеки, супермаркеты, кафе.',
-      photo: 'https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&q=80&w=800',
+      desc: 'Первые линии центральных проспектов и жилых массивов с удобной логистикой и высоким трафиком. Помещения под торговлю, аптеки, сервис и общепит.',
+      photo: '/photo/hero-building.jpg',
       tag: 'Высокий пешеходный трафик'
     },
     {
       title: 'Офисы и бизнес-центры',
-      desc: 'Офисные блоки класса B+, A в БЦ «Титан», «Royal Plaza», «Futuris», «Зеленый Луг». Продажа этажами и отдельными кабинетами.',
-      photo: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=800',
-      tag: 'Классы A и B+'
+      desc: 'Офисные блоки и отдельные административные помещения в деловых районах Минска. Продажа этажами, блоками и отдельными кабинетами.',
+      photo: '/photo/hero-office.jpg',
+      tag: 'Деловые локации Минска'
     },
     {
       title: 'Склады и логистические комплексы',
-      desc: 'Отапливаемые и сухие склады в районе МКАД, Шабаны, Колядичи, Фаниполь. Наличие пандусов, ж/д веток, кран-балок и санитарно-защитных зон.',
-      photo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800',
+      desc: 'Отапливаемые и сухие склады в районе МКАД и промузлах. Проверка подъездных путей, инженерных сетей, мощностей и целевого назначения.',
+      photo: '/photo/hero-construction.jpg',
       tag: 'Логистика у МКАД'
     },
     {
       title: 'Готовый арендный бизнес (ГАБ)',
-      desc: 'Объекты с надежными сетевыми арендаторами (Евроопт, Санта, Wildberries, медцентры) и долгосрочными договорами аренды с доходностью 9–12% годовых.',
-      photo: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800',
-      tag: 'Доходность 9–12% годовых'
+      desc: 'Коммерческие помещения с действующими арендаторами и прозрачной историей договорных отношений и платежей.',
+      photo: '/photo/hero-coworking.jpg',
+      tag: 'Действующие арендаторы'
     }
   ];
 
@@ -162,17 +171,17 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
               className="text-[17px] lg:text-[21px] font-light leading-relaxed max-w-3xl mb-8 text-white/90"
               style={{ textShadow: '0 2px 12px rgba(0,0,0,0.8)' }}
             >
-              Офисы, street retail, торговые площади, склады и готовый арендный бизнес с подтвержденной доходностью. С 2022 года АН «Фаттория» реализует коммерческие активы с расчетом финансовой модели и прямым поиском профильных инвесторов.
+              Офисы, street retail, торговые площади, склады и помещения для бизнеса в Минске и области. С 2022 года АН «Фаттория» организует профессиональную продажу коммерческих объектов, юридическую проверку и сопровождение сделок.
             </p>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/20 text-[11px] uppercase tracking-[0.18em] text-white/80">
               <span className="inline-flex items-center gap-2 font-medium"><Calendar className="w-3.5 h-3.5 text-amber-400" /> Практика с 2022 года</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
-              <span className="inline-flex items-center gap-2 font-medium"><TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Доходность 9–12% годовых</span>
+              <span className="inline-flex items-center gap-2 font-medium"><TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Аудит арендных договоров</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
               <span className="inline-flex items-center gap-2 font-medium"><Scale className="w-3.5 h-3.5 text-sky-400" /> Тарифы Минюста 1.5%–6%</span>
               <span className="w-1 h-1 rounded-full bg-white/50" />
-              <span className="inline-flex items-center gap-2 font-medium"><Shield className="w-3.5 h-3.5 text-amber-300" /> Налоговый аудит сделки</span>
+              <span className="inline-flex items-center gap-2 font-medium"><Shield className="w-3.5 h-3.5 text-amber-300" /> Юридическая чистота сделки</span>
             </div>
           </div>
         </div>
@@ -243,10 +252,24 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
           {/* Центральная колонка */}
           <main className="order-2 min-w-0 max-w-[880px] space-y-16">
 
-            {/* 01: СЕГМЕНТЫ */}
-            <section id="segments" className="scroll-mt-32">
+            <ActiveSalePropertiesSection
+              id="active-objects"
+              sectionNumber="01"
+              eyebrow="Коммерческие объекты с Realt.by"
+              title="Действующие коммерческие помещения в продаже"
+              subtitle="Офисы, торговые площади, склады, производственные и сервисные объекты в актуальной продаже."
+              category="commercial"
+              properties={properties}
+              agents={agents}
+              onRequestConsultation={() =>
+                document.getElementById('lead-form')?.scrollIntoView({ behavior: 'smooth' })
+              }
+            />
+
+            {/* 02: СЕГМЕНТЫ */}
+            <section id="segments" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                01 · Классификация активов
+                02 · Классификация активов
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -302,7 +325,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
             {/* 02: ОПЫТ ФАТТОРИИ С 2022 ГОДА */}
             <section id="experience" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                02 · Практика
+                03 · Практика
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -322,21 +345,21 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
               {/* Фото вставка */}
               <div className="my-8 rounded-3xl overflow-hidden border border-stone-200 shadow-md">
                 <img
-                  src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600"
-                  alt="Современный офис в бизнес-центре Минска"
+                  src="/photo/hero-architecture.jpg"
+                  alt="Бизнес-центры и коммерческая недвижимость Минска"
                   className="w-full h-80 object-cover"
                 />
                 <div className="p-4 bg-stone-50 text-xs text-stone-500 flex items-center justify-between border-t border-stone-200">
-                  <span>Офисный блок 280 кв.м в БЦ на проспекте Победителей, закрытая сделка АН «Фаттория»</span>
-                  <span className="font-semibold text-stone-700">Целевой инвестор</span>
+                  <span>Бизнес-центры и коммерческие помещения Минска: правовой и финансовый аудит</span>
+                  <span className="font-semibold text-stone-700">Сопровождение сделки</span>
                 </div>
               </div>
             </section>
 
-            {/* 03: ПУЛ ИНВЕСТОРОВ */}
+            {/* 03: ЦЕЛЕВЫЕ ПОКУПАТЕЛИ */}
             <section id="investors" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                03 · Прямые покупатели
+                04 · Прямые покупатели
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -346,10 +369,10 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
               </h2>
               <div className="prose text-stone-600 text-[16px] leading-relaxed font-light space-y-4">
                 <p>
-                  С 2022 года АН «Фаттория» ведет постоянный диалог с инвестиционными компаниями, частными family-офисами и торговыми сетями Беларуси. Мы регулярно получаем конкретные запросы на выкуп помещений от $100 000 до $2 500 000.
+                  С 2022 года АН «Фаттория» работает с корпоративными покупателями, представителями бизнеса и частными инвесторами в Беларуси, подбирая ликвидные офисные, торговые и складские помещения под конкретные задачи.
                 </p>
                 <p>
-                  Если ваш объект соответствует критериям доходности, мы можем организовать закрытые переговоры с целевым покупателем без публичной огласки в СМИ.
+                  Если вам важна деликатность продажи действующего объекта или бизнеса, мы организуем предварительные переговоры с целевыми покупателями без лишнего информационного шума.
                 </p>
               </div>
             </section>
@@ -357,7 +380,7 @@ export default function ProdazhaPomescheniyaPage({ navigateTo, handleAddLead }: 
             {/* 04: FAQ */}
             <section id="faq" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                04 · Часто задаваемые вопросы
+                05 · Часто задаваемые вопросы
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"

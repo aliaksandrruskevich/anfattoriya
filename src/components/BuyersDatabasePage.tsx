@@ -1299,7 +1299,7 @@ export default function BuyersDatabasePage({
                           {/* Property Photo & Badges */}
                           <div className="relative h-44 rounded-xl overflow-hidden mb-3 bg-stone-100">
                             <img
-                              src={prop.image || prop.images?.[0] || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'}
+                              src={prop.image || prop.images?.[0] || prop.photo || '/photo/logo.png'}
                               alt={prop.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               referrerPolicy="no-referrer"

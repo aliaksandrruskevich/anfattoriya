@@ -7,20 +7,27 @@ import {
   AlertTriangle, KeyRound, Check, Star, Calendar, Share2, 
   Bookmark, Send, MessageCircle, AlertCircle, Users
 } from 'lucide-react';
-import { PageId } from '../types';
+import type { Agent, PageId, Property } from '../types';
+import { isRealtorAgent } from '@/lib/agentUtils';
+import { getAgentUrl } from '@/lib/routes';
+import { AgentBrandAvatar } from './AgentBrandAvatar';
+import ActiveSalePropertiesSection from './ActiveSalePropertiesSection';
 
 interface ProdazhaKomnatyPageProps {
   activePage?: PageId;
   navigateTo: (pageId: PageId) => void;
   handleAddLead: (name: string, phone: string, extra: string, source: string) => void;
+  properties?: Property[];
+  agents?: Agent[];
 }
 
 const displayFont = "'Cormorant Garamond', 'Georgia', serif";
 const bodyFont = "'Raleway', system-ui, sans-serif";
 
-const HERO_PHOTO = 'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&q=80&w=1920';
+const HERO_PHOTO = '/photo/hero-interior.jpg';
 
 const TOC_ITEMS = [
+  { id: 'active-objects', label: 'Актуальные комнаты и доли в продаже' },
   { id: 'status', label: 'Правовой статус комнаты и доли' },
   { id: 'experience', label: 'Опыт «Фаттории» с 2022 года' },
   { id: 'preemption', label: 'Преимущественное право (ст. 253 ГК)' },
@@ -30,12 +37,23 @@ const TOC_ITEMS = [
   { id: 'faq', label: 'Частые вопросы и ответы' },
 ];
 
-export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: ProdazhaKomnatyPageProps) {
-  const [activeId, setActiveId] = useState<string>('status');
+export default function ProdazhaKomnatyPage({
+  navigateTo,
+  handleAddLead,
+  properties = [],
+  agents = [],
+}: ProdazhaKomnatyPageProps) {
+  const [activeId, setActiveId] = useState<string>('active-objects');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [leadSent, setLeadSent] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  const realtors = agents.filter(isRealtorAgent);
+  const featuredRealtor =
+    realtors.find(
+      (a) => a.specialization === 'assessment' || (a.role || '').toLowerCase().includes('юрист')
+    ) || realtors[0];
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -213,21 +231,35 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
 
             <div className="p-5 bg-gradient-to-br from-amber-50 to-stone-100 rounded-2xl border border-amber-200/70 text-stone-800">
               <div className="flex items-center gap-2 text-amber-800 text-[11px] font-bold uppercase tracking-wider mb-2">
-                <Award className="w-4 h-4" /> Судебная практика с 2022
+                <Award className="w-4 h-4" /> Правовая практика с 2022
               </div>
               <p className="text-xs leading-relaxed text-stone-600">
-                Более 90 сложных долевых сделок без единого судебного оспаривания со стороны сособственников.
+                Строгое соблюдение ст. 253 ГК РБ и порядка нотариального извещения сособственников.
               </p>
             </div>
           </aside>
 
           {/* Центральная колонка */}
           <main className="order-2 min-w-0 max-w-[880px] space-y-16">
-            
-            {/* 01: ПРАВОВОЙ СТАТУС */}
-            <section id="status" className="scroll-mt-32">
+
+            <ActiveSalePropertiesSection
+              id="active-objects"
+              sectionNumber="01"
+              eyebrow="Комнаты и доли с Realt.by"
+              title="Действующие комнаты и доли в продаже"
+              subtitle="Все действующие предложения комнат, выделенных долей в квартирах и частей домов из актуальной базы агентства на Realt.by."
+              category="room_share"
+              properties={properties}
+              agents={agents}
+              onRequestConsultation={() =>
+                document.getElementById('lead-form')?.scrollIntoView({ behavior: 'smooth' })
+              }
+            />
+
+            {/* 02: ПРАВОВОЙ СТАТУС */}
+            <section id="status" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                01 · Специфика долевой собственности
+                02 · Специфика долевой собственности
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -237,7 +269,7 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
               </h2>
               <div className="prose text-stone-600 text-[16px] leading-relaxed font-light space-y-4">
                 <p>
-                  Продажа доли в праве общей долевой собственности — одна из наиболее деликатных и конфликтных сфер в недвижимости Беларуси. Часто собственники находятся в натянутых отношениях: бывшие супруги, наследники или чужие люди, получившие квадратные метры в результате сложных разъездов.
+                  Продажа доли в праве общей долевой собственности — одна из наиболее деликатных и конфликтных сфер в недвижимости Беларуси. Часто собственники находятся в натянутых отношениях: бывшие супруги, наследники или люди, получившие квадратные метры в результате сложных разъездов.
                 </p>
                 <p>
                   Главная задача риэлтера и юриста АН «Фаттория» — перевести эмоциональный конфликт в строго правовое русло, исключить манипуляции и обеспечить безукоризненное соблюдение гражданского и жилищного законодательства РБ.
@@ -247,21 +279,21 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
               {/* Фото вставка */}
               <div className="my-8 rounded-3xl overflow-hidden border border-stone-200 shadow-md">
                 <img
-                  src="https://images.unsplash.com/photo-1560185893-a55cbc8c57e8?auto=format&fit=crop&q=80&w=1600"
-                  alt="Интерьер изолированной комнаты"
+                  src="/photo/hero-apartment.jpg"
+                  alt="Правовая экспертиза комнат и долей в Минске"
                   className="w-full h-80 object-cover"
                 />
                 <div className="p-4 bg-stone-50 text-xs text-stone-500 flex items-center justify-between border-t border-stone-200">
-                  <span>Изолированная комната 17.4 кв.м с балконом в 3-комнатной квартире, ул. Якуба Коласа</span>
-                  <span className="font-semibold text-stone-700">Продана по полной стоимости</span>
+                  <span>Подготовка документов, нотариальное извещение и оформление в БТИ</span>
+                  <span className="font-semibold text-stone-700">Ст. 253 ГК РБ</span>
                 </div>
               </div>
             </section>
 
-            {/* 02: ОПЫТ ФАТТОРИИ С 2022 ГОДА */}
+            {/* 03: ОПЫТ ФАТТОРИИ С 2022 ГОДА */}
             <section id="experience" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                02 · Практика АН «Фаттория»
+                03 · Практика АН «Фаттория»
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -271,10 +303,10 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
               </h2>
               <div className="prose text-stone-600 text-[16px] leading-relaxed font-light space-y-4">
                 <p>
-                  С 2022 года агентство недвижимости «Фаттория» сформировало отдельное юридическое подразделение по сложным долевым объектам. Мы выступаем профессиональными медиаторами в переговорах между конфликтующими сособственниками.
+                  С 2022 года специалисты АН «Фаттория» сопровождают сделки с долевой собственностью и выделенными комнатами в Минске и области, выступая профессиональными посредниками в переговорах между сособственниками.
                 </p>
                 <p>
-                  В 70% случаев благодаря аргументированным переговорам нам удается убедить соседей продать квартиру целиком как единый объект. В результате каждый сособственник получает значительно больше денег, чем при раздельной продаже долей.
+                  При готовности сторон к диалогу мы помогаем организовать продажу квартиры целиком как единого объекта — в таком случае каждый сособственник обычно получает большую выручку, чем при раздельной продаже доли.
                 </p>
               </div>
             </section>
@@ -282,7 +314,7 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
             {/* 03: ПРЕИМУЩЕСТВЕННОЕ ПРАВО */}
             <section id="preemption" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                03 · Статья 253 ГК РБ
+                04 · Статья 253 ГК РБ
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -307,7 +339,7 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
             {/* 04: НОТАРИАЛЬНОЕ ИЗВЕЩЕНИЕ */}
             <section id="notification" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                04 · Нотариальная процедура
+                05 · Нотариальная процедура
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -345,7 +377,7 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
             {/* 05: ПОРЯДОК ПОЛЬЗОВАНИЯ */}
             <section id="order" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                05 · Соглашение
+                06 · Соглашение
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -365,7 +397,7 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
             {/* 06: ОШИБКИ */}
             <section id="mistakes" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                06 · Предостережение
+                07 · Предостережение
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -392,7 +424,7 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
             {/* 07: FAQ */}
             <section id="faq" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                07 · Часто задаваемые вопросы
+                08 · Часто задаваемые вопросы
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -525,16 +557,25 @@ export default function ProdazhaKomnatyPage({ navigateTo, handleAddLead }: Proda
 
             <div className="p-6 bg-stone-50 rounded-3xl border border-stone-200">
               <div className="flex items-center gap-3.5 mb-4">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
-                  <img
-                    src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=200"
-                    alt="Юрист по жилищному праву"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div>
-                  <div className="font-semibold text-stone-900 text-sm">Юрист по долям</div>
-                  <div className="text-[11px] text-stone-500">АН «Фаттория» · Минск</div>
+                <AgentBrandAvatar
+                  photo={featuredRealtor?.photo || '/photo/ivanova.jpg'}
+                  name={featuredRealtor?.name || 'Юрист по долям'}
+                  className="w-12 h-12 rounded-full object-cover shrink-0 border border-stone-300"
+                />
+                <div className="min-w-0">
+                  {featuredRealtor ? (
+                    <Link
+                      href={getAgentUrl(featuredRealtor)}
+                      className="font-semibold text-stone-900 text-sm hover:text-amber-800 transition-colors block truncate"
+                    >
+                      {featuredRealtor.name}
+                    </Link>
+                  ) : (
+                    <div className="font-semibold text-stone-900 text-sm">Юрист по долям</div>
+                  )}
+                  <div className="text-[11px] text-stone-500 truncate">
+                    {featuredRealtor?.role || 'АН «Фаттория» · Минск'}
+                  </div>
                 </div>
               </div>
               <p className="text-xs text-stone-600 mb-4 font-light leading-relaxed">

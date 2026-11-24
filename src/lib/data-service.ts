@@ -1,17 +1,139 @@
 import { execute, isDbMockMode, query, queryOne } from './db';
 import { getAgents } from './repository';
 import { matchAgentByName } from './matchAgent';
+import { isRealtorAgent, isSamePersonName } from './agentUtils';
 import { getMockStore } from './mockStore';
 import {
   isPublicProperty,
   sanitizeAgentForPublic,
   sanitizePropertyForPublic,
 } from './sanitize';
-import type { Property } from '../types';
+import type { Agent, Property } from '../types';
 
 const REALT_FEED_URL = process.env.REALT_FEED_URL || '';
 const FETCH_TIMEOUT_MS = 30 * 1000;
+const MOCK_FETCH_TIMEOUT_MS = 8 * 1000;
+const MOCK_SYNC_TTL_MS = 15 * 60 * 1000;
 const ARCHIVE_THRESHOLD_MINUTES = 5;
+
+const globalForSync = globalThis as unknown as {
+  __mockSyncPromise?: Promise<{ ok: boolean; count: number; error?: string }> | null;
+  __mockLastSyncAt?: number;
+};
+
+export async function ensureMockRealtSynced(force = false): Promise<void> {
+  if (!isDbMockMode()) return;
+
+  const now = Date.now();
+  const lastSync = globalForSync.__mockLastSyncAt || 0;
+  const store = getMockStore();
+  const hasRealSynced = store.properties.some((p) => p.sourceType === 'realt');
+
+  if (!force && hasRealSynced && now - lastSync < MOCK_SYNC_TTL_MS) {
+    return;
+  }
+
+  if (!globalForSync.__mockSyncPromise) {
+    globalForSync.__mockSyncPromise = syncRealtToDb()
+      .catch((err) => {
+        console.warn('[Realt.by Mock Sync] ⚠️ Ошибка автосинхронизации:', err?.message || err);
+        return { ok: false, count: 0, error: String(err?.message || err) };
+      })
+      .finally(() => {
+        globalForSync.__mockSyncPromise = null;
+      });
+  }
+
+  await globalForSync.__mockSyncPromise;
+}
+
+function mergeMockAgents(remoteAgents: Agent[]) {
+  const store = getMockStore();
+  const defaultHashedPass = store.agents.find((a) => a.id === 'callcenter')?.password;
+
+  for (const remote of remoteAgents) {
+    if (!isRealtorAgent(remote)) continue;
+
+    const existing = store.agents.find(
+      (a) => a.id === remote.id || isSamePersonName(a.name, remote.name)
+    );
+
+    if (existing) {
+      existing.photo = remote.photo || existing.photo;
+      existing.phone = remote.phone || existing.phone;
+      existing.role = remote.role || existing.role;
+      existing.experience = remote.experience || existing.experience;
+      existing.dealsCount = remote.dealsCount ?? existing.dealsCount;
+      existing.achievements = remote.achievements || existing.achievements;
+      existing.description = remote.description || existing.description;
+      existing.firstName = remote.firstName || existing.firstName;
+      existing.lastName = remote.lastName || existing.lastName;
+      existing.patronymic = remote.patronymic || existing.patronymic;
+      existing.specialization = remote.specialization || existing.specialization;
+      existing.isApproved = true;
+      existing.isDismissed = false;
+      existing.status = 'active';
+    } else {
+      store.agents.push({
+        ...remote,
+        isAdmin: false,
+        isApproved: true,
+        isDismissed: false,
+        status: 'active',
+        password: defaultHashedPass,
+      });
+    }
+  }
+}
+
+function applyMockSyncedProperties(parsedProps: Property[]): number {
+  const store = getMockStore();
+  const realtors = store.agents.filter(isRealtorAgent);
+  const manualOrCrm = store.properties.filter((p) => p.sourceType !== 'realt');
+
+  const normalizedRealt: Property[] = parsedProps
+    .filter(
+      (p) =>
+        p &&
+        (!p.status || p.status === 'active') &&
+        p.isPublished !== false &&
+        !p.isClosedBase &&
+        !p.internalOnly &&
+        !p.crmOnly
+    )
+    .map((p) => {
+      const matched = matchAgentByName(p.assignedAgentName || p.agentName, realtors);
+      const safePhoto =
+        p.photo && !p.photo.includes('images.unsplash.com') ? p.photo : '/photo/logo.png';
+      const safePhotos = Array.isArray(p.photos)
+        ? p.photos.filter((u) => u && !u.includes('images.unsplash.com'))
+        : [];
+      const fixedType =
+        p.type === 'commercial' && !p.objectType
+          ? detectTypeFromObjectType(p.objectType || '', p.rooms, p.title)
+          : p.type;
+
+      return {
+        ...p,
+        type: fixedType,
+        photo: safePhoto,
+        photos: safePhotos.length ? safePhotos : [safePhoto],
+        status: 'active',
+        isPublished: true,
+        isClosedBase: false,
+        source: p.source || 'realt',
+        sourceType: 'realt',
+        assignedAgentId: matched?.id ?? p.assignedAgentId,
+        assignedAgentName: matched?.name ?? p.assignedAgentName ?? p.agentName,
+        agentPhoto: matched?.photo ?? p.agentPhoto,
+        agentPhone: matched?.phone ?? p.agentPhone,
+      };
+    });
+
+  store.properties = [...normalizedRealt, ...manualOrCrm];
+  globalForSync.__mockLastSyncAt = Date.now();
+  return normalizedRealt.length;
+}
 
 // ==================== SYNC ====================
 
@@ -25,7 +147,10 @@ export async function syncRealtToDb(): Promise<{ ok: boolean; count: number; err
   if (REALT_FEED_URL) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        isDbMockMode() ? MOCK_FETCH_TIMEOUT_MS : FETCH_TIMEOUT_MS
+      );
 
       const response = await fetch(REALT_FEED_URL, {
         headers: {
@@ -59,9 +184,45 @@ export async function syncRealtToDb(): Promise<{ ok: boolean; count: number; err
       xmlText = await fs.readFile(feedPath, 'utf-8');
       console.log('[Realt.by Sync] 📂 Использован локальный feed.xml');
     } catch {
-      console.error('[Realt.by Sync] ❌ Не удалось получить фид ни через fetch, ни через feed.xml');
-      return { ok: false, count: 0, error: 'Feed not available' };
+      xmlText = null;
     }
+  }
+
+  // 3. В mock/preview режиме (без БД), если XML фид недоступен, синхронизируем с публичным фидом агентства
+  if (!xmlText && isDbMockMode()) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), MOCK_FETCH_TIMEOUT_MS);
+      const [agentsRes, propsRes] = await Promise.all([
+        fetch('https://fattoria.by/api/agents', { cache: 'no-store', signal: controller.signal }),
+        fetch('https://fattoria.by/api/properties', { cache: 'no-store', signal: controller.signal }),
+      ]);
+      clearTimeout(timeout);
+
+      if (agentsRes.ok) {
+        const remoteAgents = (await agentsRes.json()) as Agent[];
+        if (Array.isArray(remoteAgents)) {
+          mergeMockAgents(remoteAgents);
+        }
+      }
+
+      if (propsRes.ok) {
+        const remoteProps = (await propsRes.json()) as Property[];
+        if (Array.isArray(remoteProps) && remoteProps.length > 0) {
+          const count = applyMockSyncedProperties(remoteProps);
+          console.log(`[Realt.by Mock Sync] ✅ Синхронизировано ${count} активных объектов`);
+          return { ok: true, count };
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Realt.by Mock Sync] ⚠️ Ошибка загрузки публичных объектов: ${err?.message || err}`);
+    }
+    return { ok: false, count: 0, error: 'Feed not available' };
+  }
+
+  if (!xmlText) {
+    console.error('[Realt.by Sync] ❌ Не удалось получить фид ни через fetch, ни через feed.xml');
+    return { ok: false, count: 0, error: 'Feed not available' };
   }
 
   const parsed = parseRealtFeed(xmlText);
@@ -71,6 +232,11 @@ export async function syncRealtToDb(): Promise<{ ok: boolean; count: number; err
   }
 
   console.log(`[Realt.by Sync] 📦 Распарсено объектов: ${parsed.properties.length}`);
+
+  if (isDbMockMode()) {
+    const count = applyMockSyncedProperties(parsed.properties as unknown as Property[]);
+    return { ok: true, count };
+  }
 
   const agents = await getAgents();
 
@@ -249,9 +415,8 @@ export async function syncRealtToDb(): Promise<{ ok: boolean; count: number; err
 // ==================== READ ====================
 
 export async function getRealtData(force: boolean = false) {
-  void force;
-
   if (isDbMockMode()) {
+    await ensureMockRealtSynced(force);
     const store = getMockStore();
     const agents = (await getAgents()).map(sanitizeAgentForPublic);
     const properties = store.properties
@@ -261,8 +426,8 @@ export async function getRealtData(force: boolean = false) {
     return {
       properties,
       agents,
-      lastSync: Date.now(),
-      fromCache: false,
+      lastSync: globalForSync.__mockLastSyncAt || Date.now(),
+      fromCache: !force,
     };
   }
 
@@ -289,6 +454,7 @@ export async function getRealtData(force: boolean = false) {
 
 export async function getPropertyBySlug(slug: string): Promise<Property | null> {
   if (isDbMockMode()) {
+    await ensureMockRealtSynced(false);
     const store = getMockStore();
     const found = store.properties.find(
       (p) => (p.slug === slug || p.id === slug) && isPublicProperty(p)
@@ -312,6 +478,7 @@ export async function getPropertyBySlug(slug: string): Promise<Property | null> 
 
 export async function getAllPropertySlugs(): Promise<string[]> {
   if (isDbMockMode()) {
+    await ensureMockRealtSynced(false);
     return getMockStore().properties
       .filter((p) => isPublicProperty(p) && p.slug)
       .map((p) => p.slug as string);
@@ -627,12 +794,27 @@ interface ParsedProperty {
 
 function detectTypeFromObjectType(
   objectType: string,
-  rooms: number | undefined
+  rooms: number | undefined,
+  title: string = ''
 ): 'apartment' | 'commercial' | 'house' | 'plot' {
   const ot = (objectType || '').toLowerCase().trim();
+  const tl = (title || '').toLowerCase();
+
+  if (ot.includes('офис') || ot.includes('склад') || ot.includes('торгов') || ot.includes('кафе') || ot.includes('магазин') || ot.includes('ресторан') || ot.includes('гараж') || ot.includes('машиномест') || ot.includes('бизнес') || ot.includes('производств') || ot.includes('сфера услуг')) {
+    return 'commercial';
+  }
 
   if (!ot) {
     if (rooms && rooms > 0) return 'apartment';
+    if (
+      /(?:ком\.?\s*квартира|комнатная\s+квартира|квартира)/i.test(tl) &&
+      !/(офис|склад|торгов|помещени|бизнес)/i.test(tl)
+    ) {
+      return 'apartment';
+    }
+    if (/^\s*(?:дом|коттедж|дача)(?=$|[\s,])/i.test(tl)) {
+      return 'house';
+    }
     return 'commercial';
   }
 
@@ -641,7 +823,8 @@ function detectTypeFromObjectType(
     ot.includes('коттедж') ||
     ot.includes('дача') ||
     ot.includes('таунхаус') ||
-    ot.includes('резиденц')
+    ot.includes('резиденц') ||
+    ot.includes('полдома')
   ) {
     return 'house';
   }
@@ -650,7 +833,13 @@ function detectTypeFromObjectType(
     return 'plot';
   }
 
-  if (ot === 'квартира') {
+  if (
+    ot === 'квартира' ||
+    ot === 'комната' ||
+    ot === 'доля' ||
+    ot.includes('комната в') ||
+    ot.includes('дол')
+  ) {
     return 'apartment';
   }
 
@@ -679,7 +868,7 @@ function parseRealtFeed(xmlText: string): { properties: ParsedProperty[] } {
     const rooms = parseInt(recText.match(/<rooms>(\d+)<\/rooms>/)?.[1] || '0', 10) || undefined;
 
     const objectTypeRaw = (recText.match(/<object_type>([\s\S]*?)<\/object_type>/)?.[1] || '').trim();
-    const type = detectTypeFromObjectType(objectTypeRaw, rooms);
+    const type = detectTypeFromObjectType(objectTypeRaw, rooms, title);
 
     const lName = (recText.match(/<responsible_last_name>([\s\S]*?)<\/responsible_last_name>/)?.[1] || '').trim();
     const fName = (recText.match(/<responsible_first_name>([\s\S]*?)<\/responsible_first_name>/)?.[1] || '').trim();
@@ -824,7 +1013,7 @@ function parseRealtFeed(xmlText: string): { properties: ParsedProperty[] } {
       if (pm[1] && !photos.includes(pm[1])) photos.push(pm[1]);
     }
     if (!photos.length)
-      photos.push('https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80');
+      photos.push('/photo/logo.png');
 
     const features: string[] = [
       rooms && `${rooms}-комн.`,

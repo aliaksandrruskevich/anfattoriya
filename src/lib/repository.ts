@@ -44,6 +44,8 @@ function decodeHtmlEntities(text: string | null | undefined): string | undefined
 
 export async function getAgents(): Promise<Agent[]> {
   if (isDbMockMode()) {
+    const { ensureMockRealtSynced } = await import('./data-service');
+    await ensureMockRealtSynced();
     const store = getMockStore();
     return store.agents
       .filter((a) => isRealtorAgent(a))
@@ -71,6 +73,8 @@ export async function getAgents(): Promise<Agent[]> {
 
 export async function getAllAgents(): Promise<Agent[]> {
   if (isDbMockMode()) {
+    const { ensureMockRealtSynced } = await import('./data-service');
+    await ensureMockRealtSynced();
     const store = getMockStore();
     return store.agents.map((a) => ({
       ...sanitizeAgentForClient(a),
@@ -92,6 +96,8 @@ export async function getAllAgents(): Promise<Agent[]> {
 
 export async function getAgentById(id: string): Promise<Agent | null> {
   if (isDbMockMode()) {
+    const { ensureMockRealtSynced } = await import('./data-service');
+    await ensureMockRealtSynced();
     const store = getMockStore();
     const found = store.agents.find((a) => a.id === id);
     if (!found) return null;
@@ -183,6 +189,8 @@ export async function getProperties(filters?: {
   limit?: number;
 }): Promise<Property[]> {
   if (isDbMockMode()) {
+    const { ensureMockRealtSynced } = await import('./data-service');
+    await ensureMockRealtSynced();
     let list = [...getMockStore().properties];
     if (filters?.type) list = list.filter((p) => p.type === filters.type);
     if (filters?.status) list = list.filter((p) => (p.status || 'active') === filters.status);
@@ -219,6 +227,8 @@ export async function getProperties(filters?: {
 
 export async function getPropertyBySlug(slug: string): Promise<Property | null> {
   if (isDbMockMode()) {
+    const { ensureMockRealtSynced } = await import('./data-service');
+    await ensureMockRealtSynced();
     return (
       getMockStore().properties.find(
         (p) => p.slug === slug || p.id === slug
@@ -235,6 +245,8 @@ export async function getPropertyBySlug(slug: string): Promise<Property | null> 
 
 export async function getAllPropertySlugs(): Promise<string[]> {
   if (isDbMockMode()) {
+    const { ensureMockRealtSynced } = await import('./data-service');
+    await ensureMockRealtSynced();
     return getMockStore().properties
       .filter((p) => (p.status || 'active') === 'active' && p.isPublished !== false && !p.isClosedBase && p.slug)
       .map((p) => p.slug as string);

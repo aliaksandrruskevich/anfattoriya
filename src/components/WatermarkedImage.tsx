@@ -36,8 +36,7 @@ export const WatermarkedImage: React.FC<WatermarkedImageProps> = ({
 }) => {
   const [hasError, setHasError] = useState(false);
 
-  const fallbackSrc =
-    'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80';
+  const fallbackSrc = '/photo/logo.png';
 
   const positionClasses = {
     'bottom-right': 'bottom-2.5 right-2.5 sm:bottom-3 sm:right-3',

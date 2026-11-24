@@ -8,20 +8,27 @@ import {
   Bookmark, TrendingUp, Users, CheckCircle, Send, MessageCircle,
   Camera, Eye, Layers, Compass
 } from 'lucide-react';
-import { PageId } from '../types';
+import type { Agent, PageId, Property } from '../types';
+import { isRealtorAgent } from '@/lib/agentUtils';
+import { getAgentUrl } from '@/lib/routes';
+import { AgentBrandAvatar } from './AgentBrandAvatar';
+import ActiveSalePropertiesSection from './ActiveSalePropertiesSection';
 
 interface ProdazhaKvartiryPageProps {
   activePage?: PageId;
   navigateTo: (pageId: PageId) => void;
   handleAddLead: (name: string, phone: string, extra: string, source: string) => void;
+  properties?: Property[];
+  agents?: Agent[];
 }
 
 const displayFont = "'Cormorant Garamond', 'Georgia', serif";
 const bodyFont = "'Raleway', system-ui, sans-serif";
 
-const HERO_PHOTO = 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1920';
+const HERO_PHOTO = '/photo/hero-apartment.jpg';
 
 const TOC_ITEMS = [
+  { id: 'active-objects', label: 'Актуальные квартиры в продаже' },
   { id: 'segments', label: 'Сегменты квартир в Минске' },
   { id: 'history', label: 'Опыт «Фаттории» с 2022 года' },
   { id: 'staging', label: 'Хоум-стейджинг и фотосет' },
@@ -31,12 +38,20 @@ const TOC_ITEMS = [
   { id: 'faq', label: 'Вопросы и ответы' },
 ];
 
-export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: ProdazhaKvartiryPageProps) {
-  const [activeId, setActiveId] = useState<string>('segments');
+export default function ProdazhaKvartiryPage({
+  navigateTo,
+  handleAddLead,
+  properties = [],
+  agents = [],
+}: ProdazhaKvartiryPageProps) {
+  const [activeId, setActiveId] = useState<string>('active-objects');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [leadSent, setLeadSent] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  const realtors = agents.filter(isRealtorAgent);
+  const featuredRealtor = realtors.find((a) => a.specialization === 'sale') || realtors[0];
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -89,25 +104,25 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
     {
       title: 'Вторичный фонд и чешские проекты',
       desc: 'Панельные и кирпичные дома во Фрунзенском, Заводском, Советском и Московском районах. Глубокий архивный аудит приватизации, выписанных несовершеннолетних и отказников.',
-      photo: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&q=80&w=800',
+      photo: '/photo/hero-building.jpg',
       tag: 'Проверка истории с 1990-х'
     },
     {
       title: 'Современные жилые комплексы (Новостройки)',
       desc: 'Минск-Мир, Новая Боровая, Левада, Маяк Минска, Парк Челюскинцев, D3. Продажа видовых квартир с дизайнерским ремонтом и квартир под чистовую отделку.',
-      photo: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800',
+      photo: '/photo/hero-flat.jpg',
       tag: 'Презентация инфраструктуры и видов'
     },
     {
       title: 'Сталинки в историческом центре',
-      desc: 'Проспект Независимости, Карла Маркса, Ленина, площадь Победы. Высокие потолки 3.2 м, толстые кирпичные стены, согласование перепланировок в охранных зонах КГИОП.',
-      photo: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=800',
+      desc: 'Проспект Независимости, Карла Маркса, Ленина, площадь Победы. Высокие потолки 3.2 м, толстые кирпичные стены, согласование перепланировок в охранных зонах.',
+      photo: '/photo/hero-architecture.jpg',
       tag: 'Исторический центр Минска'
     },
     {
       title: 'Элитные пентхаусы и клубные дома',
-      desc: 'Введенские ворота, Ваньковича, Дрозды, Сторожовская. Индивидуальные показы для проверенных состоятельных покупателей без лишнего публичного шума.',
-      photo: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=800',
+      desc: 'Индивидуальные показы для проверенных покупателей с полным юридическим и финансовым сопровождением сделки.',
+      photo: '/photo/hero-interior.jpg',
       tag: 'Конфиденциальные сделки'
     }
   ];
@@ -289,11 +304,25 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
 
           {/* Центральная колонка */}
           <main className="order-2 min-w-0 max-w-[880px] space-y-16">
-            
-            {/* 01: СЕГМЕНТЫ КВАРТИР */}
-            <section id="segments" className="scroll-mt-32">
+
+            <ActiveSalePropertiesSection
+              id="active-objects"
+              sectionNumber="01"
+              eyebrow="Актуальные квартиры с Realt.by"
+              title="Действующие квартиры в продаже"
+              subtitle="Все действующие предложения квартир агентства АН «Фаттория» на продажу с актуальными ценами и ответственными риэлтерами."
+              category="apartment"
+              properties={properties}
+              agents={agents}
+              onRequestConsultation={() =>
+                document.getElementById('lead-form')?.scrollIntoView({ behavior: 'smooth' })
+              }
+            />
+
+            {/* 02: СЕГМЕНТЫ КВАРТИР */}
+            <section id="segments" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                01 · Классификация жилья
+                02 · Классификация жилья
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -349,7 +378,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
             {/* 02: ОПЫТ ФАТТОРИИ С 2022 ГОДА */}
             <section id="history" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                02 · Экспертиза
+                03 · Экспертиза
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -369,13 +398,13 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
               {/* Фото вставка */}
               <div className="my-8 rounded-3xl overflow-hidden border border-stone-200 shadow-md">
                 <img
-                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=1600"
+                  src="/photo/hero-building.jpg"
                   alt="Современный жилой комплекс в Минске"
                   className="w-full h-80 object-cover"
                 />
                 <div className="p-4 bg-stone-50 text-xs text-stone-500 flex items-center justify-between border-t border-stone-200">
-                  <span>ЖК «Новая Боровая», 3-комнатная квартира, реализованная АН «Фаттория»</span>
-                  <span className="font-semibold text-stone-700">Средний срок — 26 дней</span>
+                  <span>Современные жилые комплексы и вторичный фонд Минска</span>
+                  <span className="font-semibold text-stone-700">Средний срок — 26 дней (мин. 2 дня)</span>
                 </div>
               </div>
             </section>
@@ -383,7 +412,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
             {/* 03: ХОУМ-СТЕЙДЖИНГ */}
             <section id="staging" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                03 · Предпродажная подготовка
+                04 · Предпродажная подготовка
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -420,7 +449,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
             {/* 04: АЛЬТЕРНАТИВНЫЕ СДЕЛКИ */}
             <section id="chains" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                04 · Сложные цепочки
+                05 · Сложные цепочки
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -430,10 +459,10 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
               </h2>
               <div className="prose text-stone-600 text-[16px] leading-relaxed font-light space-y-4">
                 <p>
-                  Более 65% сделок на минском рынке — встречные (альтернативные). Собственник продает «однушку» и одновременно покупает просторную трехкомнатную квартиру с привлечением семейного капитала или банковского кредита.
+                  Значительная часть сделок на минском рынке — встречные (альтернативные). Собственник продает однокомнатную квартиру и одновременно покупает просторное жильё с привлечением собственных средств, семейного капитала или банковского кредита.
                 </p>
                 <p>
-                  Главный риск для продавца без опытного риэлтера — остаться без жилья и с обесценивающимися деньгами, если цепочка разорвется. В АН «Фаттория» синхронизируются все этапы: подписание предварительных договоров, внесение задатков, снятие с регистрационного учета и освобождение квартир.
+                  Главный риск для продавца без опытного риэлтера — остаться без жилья или сорвать встречную покупку, если цепочка разорвется. В АН «Фаттория» синхронизируются все этапы: подписание предварительных договоров, внесение задатков, снятие с регистрационного учета и освобождение квартир.
                 </p>
               </div>
 
@@ -453,7 +482,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
             {/* 05: ПАКЕТ ДОКУМЕНТОВ */}
             <section id="documents" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                05 · Юридическая документация
+                06 · Юридическая документация
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -484,7 +513,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
             {/* 06: ЦЕНОВАЯ СТРАТЕГИЯ */}
             <section id="pricing" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                06 · Переговоры
+                07 · Переговоры
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -505,7 +534,7 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
             {/* 07: FAQ */}
             <section id="faq" className="scroll-mt-32 pt-8 border-t border-stone-200">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] mb-2 text-amber-800">
-                07 · Часто задаваемые вопросы
+                08 · Часто задаваемые вопросы
               </div>
               <h2
                 className="text-stone-900 mb-6 font-normal tracking-tight"
@@ -642,16 +671,25 @@ export default function ProdazhaKvartiryPage({ navigateTo, handleAddLead }: Prod
 
             <div className="p-6 bg-stone-50 rounded-3xl border border-stone-200">
               <div className="flex items-center gap-3.5 mb-4">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-stone-200 shrink-0 border border-stone-300">
-                  <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"
-                    alt="Ведущий специалист по квартирам"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div>
-                  <div className="font-semibold text-stone-900 text-sm">Специалист по квартирам</div>
-                  <div className="text-[11px] text-stone-500">АН «Фаттория» · Минск</div>
+                <AgentBrandAvatar
+                  photo={featuredRealtor?.photo || '/photo/fedorchuk.jpg'}
+                  name={featuredRealtor?.name || 'Специалист по квартирам'}
+                  className="w-12 h-12 rounded-full object-cover shrink-0 border border-stone-300"
+                />
+                <div className="min-w-0">
+                  {featuredRealtor ? (
+                    <Link
+                      href={getAgentUrl(featuredRealtor)}
+                      className="font-semibold text-stone-900 text-sm hover:text-amber-800 transition-colors block truncate"
+                    >
+                      {featuredRealtor.name}
+                    </Link>
+                  ) : (
+                    <div className="font-semibold text-stone-900 text-sm">Специалист по квартирам</div>
+                  )}
+                  <div className="text-[11px] text-stone-500 truncate">
+                    {featuredRealtor?.role || 'АН «Фаттория» · Минск'}
+                  </div>
                 </div>
               </div>
               <p className="text-xs text-stone-600 mb-4 font-light leading-relaxed">
