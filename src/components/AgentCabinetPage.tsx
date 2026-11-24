@@ -20,6 +20,7 @@ import PageHero from './PageHero';
 import LeadTaskList from './LeadTaskList';
 import BuyersCRMWorkspace from './BuyersCRMWorkspace';
 import SellerKanbanPipeline from './SellerKanbanPipeline';
+import { isRealtorAgent, isSamePersonName } from '../lib/agentUtils';
 import LeadKanbanBoard from './LeadKanbanBoard';
 const CRMAnalyticsDashboard = dynamic(() => import('./CRMAnalyticsDashboard'), {
   ssr: false,
@@ -179,15 +180,11 @@ export default function AgentCabinetPage({
   const canViewSeller = (seller: ColdSeller): boolean => {
     if (isAgentAdmin || isAgentCallCenter) return true;
     if (!loggedInAgent) return false;
-    const curName = (loggedInAgent.name || '').toLowerCase().trim();
-    const curId = (loggedInAgent.id || '').trim();
-    const agId = (seller.assignedAgentId || '').trim();
-    const agName = (seller.assignedAgentName || '').toLowerCase().trim();
-    if (!agId && !agName) return false; // Unassigned pool is strictly hidden from realtors
-    return Boolean(
-      (agId && agId === curId) ||
-      (agName && (agName === curName || agName.includes(curName) || curName.includes(agName)))
-    );
+    const curId = (loggedInAgent.id || '').trim().toLowerCase();
+    const agId = (seller.assignedAgentId || '').trim().toLowerCase();
+    if (agId && curId) return agId === curId;
+    if (!agId && !seller.assignedAgentName) return false; // Unassigned pool is strictly hidden from realtors
+    return isSamePersonName(seller.assignedAgentName, loggedInAgent.name);
   };
 
   // 3. Add sellers: Admin: Yes, Call-center: Yes, Realtor: NO
@@ -757,7 +754,7 @@ const handleSaveEditEmployee = async () => {
       return;
     }
     try {
-      const res = await fetch('/api/agents');
+      const res = await fetch('/api/agents?all=true');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (Array.isArray(data)) {
@@ -781,22 +778,21 @@ const handleSaveEditEmployee = async () => {
     if (isAgentAdmin || isAgentCallCenter) {
       if (selectedAgentFilter === 'all') return true;
       return (
-        seller.assignedAgentName === selectedAgentFilter ||
-        seller.assignedAgentId === selectedAgentFilter
+        seller.assignedAgentId === selectedAgentFilter ||
+        isSamePersonName(seller.assignedAgentName, selectedAgentFilter)
       );
     }
     if (!loggedInAgent) return false;
-    const curName = (loggedInAgent.name || '').toLowerCase().trim();
     const curId = (loggedInAgent.id || '').trim();
     const agId = (seller.assignedAgentId || '').trim();
-    const agName = (seller.assignedAgentName || '').toLowerCase().trim();
+    const agName = (seller.assignedAgentName || '').trim();
 
     if (!agId && !agName) return false; // Unassigned pool is strictly hidden from realtors
 
-    return Boolean(
-      (agId && agId === curId) ||
-      (agName && (agName === curName || agName.includes(curName) || curName.includes(agName)))
-    );
+    if (agId && curId) {
+      if (agId === curId) return true;
+    }
+    return isSamePersonName(agName, loggedInAgent.name);
   };
 
   // Filter helper for BUYERS strictly according to RBAC specification:
@@ -806,22 +802,19 @@ const handleSaveEditEmployee = async () => {
     if (isAgentAdmin || isAgentCallCenter) {
       if (selectedAgentFilter === 'all') return true;
       return (
-        buyer.assignedAgentName === selectedAgentFilter ||
         buyer.assignedAgentId === selectedAgentFilter ||
-        buyer.registeredBy === selectedAgentFilter
+        isSamePersonName(buyer.assignedAgentName, selectedAgentFilter) ||
+        isSamePersonName(buyer.registeredBy, selectedAgentFilter)
       );
     }
     if (!loggedInAgent) return false;
-    const curName = (loggedInAgent.name || '').toLowerCase().trim();
     const curId = (loggedInAgent.id || '').trim();
     const agId = (buyer.assignedAgentId || '').trim();
-    const agName = (buyer.assignedAgentName || '').toLowerCase().trim();
-    const regBy = (buyer.registeredBy || '').toLowerCase().trim();
 
     return Boolean(
       (agId && agId === curId) ||
-      (agName && (agName === curName || agName.includes(curName) || curName.includes(agName))) ||
-      (regBy && (regBy === curName || regBy.includes(curName) || curName.includes(regBy)))
+      isSamePersonName(buyer.assignedAgentName, loggedInAgent.name) ||
+      isSamePersonName(buyer.registeredBy, loggedInAgent.name)
     );
   };
 
@@ -830,25 +823,21 @@ const handleSaveEditEmployee = async () => {
     if (isAgentAdmin || isAgentCallCenter) {
       if (selectedAgentFilter === 'all') return true;
       return (
-        record.assignedAgentName === selectedAgentFilter ||
         record.assignedAgentId === selectedAgentFilter ||
-        record.agentName === selectedAgentFilter ||
-        record.registeredBy === selectedAgentFilter
+        isSamePersonName(record.assignedAgentName, selectedAgentFilter) ||
+        isSamePersonName(record.agentName, selectedAgentFilter) ||
+        isSamePersonName(record.registeredBy, selectedAgentFilter)
       );
     }
 
     if (!loggedInAgent) return false;
-    const curName = (loggedInAgent.name || '').toLowerCase().trim();
     const curId = (loggedInAgent.id || '').trim();
-
     const recAgId = (record.assignedAgentId || '').trim();
-    const recAgName = (record.assignedAgentName || record.agentName || '').toLowerCase().trim();
-    const recReg = (record.registeredBy || '').toLowerCase().trim();
 
     return Boolean(
       (recAgId && recAgId === curId) ||
-      (recAgName && (recAgName === curName || recAgName.includes(curName) || curName.includes(recAgName))) ||
-      (recReg && (recReg === curName || recReg.includes(curName) || curName.includes(recReg)))
+      isSamePersonName(record.assignedAgentName || record.agentName, loggedInAgent.name) ||
+      isSamePersonName(record.registeredBy, loggedInAgent.name)
     );
   };
 
@@ -1515,7 +1504,7 @@ const handleSaveEditEmployee = async () => {
                         className="w-full bg-stone-50 border border-stone-250 text-neutral-950 rounded-lg px-3 py-2.5 text-xs font-semibold focus:border-purple-500 outline-none"
                       >
                         <option value="">-- Выбрать из списка риэлтеров --</option>
-                        {agentsList.filter(a => !a.isAdmin && a.id !== 'admin' && a.id !== 'call-center').map(agent => (
+                        {agentsList.filter(isRealtorAgent).map(agent => (
                           <option key={agent.id} value={agent.email || agent.name}>
                             {agent.name} {agent.email ? `(${agent.email})` : ''}
                           </option>
@@ -3660,7 +3649,7 @@ const handleSaveEditEmployee = async () => {
                               className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-emerald-500 cursor-pointer"
                             >
                               <option value="">📥 Без назначения — в общий пул (Колл-центр)</option>
-                              {agentsList.filter(a => !a.isDismissed && a.status !== 'dismissed' && !a.isAdmin && a.id !== 'admin' && a.id !== 'call-center').map(a => (
+                              {agentsList.filter(isRealtorAgent).map(a => (
                                 <option key={a.id} value={a.name}>👤 {a.name} ({a.role || 'Риэлтер'})</option>
                               ))}
                             </select>
@@ -3916,7 +3905,7 @@ const handleSaveEditEmployee = async () => {
                                               className="bg-stone-50 border border-stone-250 text-stone-800 text-[11px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer w-full"
                                             >
                                               <option value="">📥 Без назначения (В общий пул)</option>
-                                              {agentsList.filter(a => !a.isDismissed && a.status !== 'dismissed' && !a.isAdmin && a.id !== 'admin' && a.id !== 'call-center').map(a => (
+                                              {agentsList.filter(isRealtorAgent).map(a => (
                                                 <option key={a.id} value={a.name}>👤 {a.name}</option>
                                               ))}
                                             </select>

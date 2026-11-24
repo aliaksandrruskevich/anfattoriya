@@ -23,6 +23,7 @@ import {
 import { AgentBrandAvatar } from './AgentBrandAvatar';
 import { getAgentUrl, getAgentFullUrl } from '../lib/routes';
 import { getAgentReviews, addAgentReview, AgentReview } from '../utils/reviewsManager';
+import { isSamePersonName } from '../lib/agentUtils';
 
 interface AgentProfilePageProps {
   agent: Agent;
@@ -69,48 +70,8 @@ const DISPLAY_FONT_CSS = `
 .fp-display { font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, 'Times New Roman', serif; }
 `;
 
-/**
- * Сравнивает два имени (например, «Герман Сергей» и «Сергей Герман»).
- * Учитывает разный порядок слов, инициалы, лишние пробелы.
- */
 function namesLikelyMatch(a?: string, b?: string): boolean {
-  if (!a || !b) return false;
-
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[.,]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  const aNorm = norm(a);
-  const bNorm = norm(b);
-  if (!aNorm || !bNorm) return false;
-
-  if (aNorm === bNorm) return true;
-  if (aNorm.includes(bNorm) || bNorm.includes(aNorm)) return true;
-
-  const aParts = aNorm.split(' ').filter((w) => w.length >= 2);
-  const bParts = bNorm.split(' ').filter((w) => w.length >= 2);
-  if (aParts.length === 0 || bParts.length === 0) return false;
-
-  const bSet = new Set(bParts);
-  let matches = 0;
-  for (const w of aParts) if (bSet.has(w)) matches++;
-  if (matches >= 2) return true;
-
-  const aFirst = aParts[0];
-  const aLast = aParts[aParts.length - 1];
-  const bFirst = bParts[0];
-  const bLast = bParts[bParts.length - 1];
-  if (
-    (aFirst === bFirst && aLast === bLast) ||
-    (aFirst === bLast && aLast === bFirst)
-  ) {
-    return true;
-  }
-
-  return false;
+  return isSamePersonName(a, b);
 }
 
 /* ---------- вспомогательные компоненты ---------- */
@@ -288,9 +249,7 @@ export default function AgentProfilePage({
   const [copiedLink, setCopiedLink] = useState(false);
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
 
-  const [agentReviews, setAgentReviews] = useState<AgentReview[]>(() => {
-    return getAgentReviews(agent.id, agent.name);
-  });
+  const [agentReviews, setAgentReviews] = useState<AgentReview[]>([]);
   const [showAddReviewModal, setShowAddReviewModal] = useState(false);
   const [newReviewAuthor, setNewReviewAuthor] = useState('');
   const [newReviewRole, setNewReviewRole] = useState('');
@@ -342,17 +301,17 @@ export default function AgentProfilePage({
     const agentIdNorm = (agent.id || '').trim().toLowerCase();
 
     return propertiesList.filter((p) => {
-      // 1. По id — самый надёжный ключ
-      if (p.assignedAgentId && agentIdNorm) {
-        if (String(p.assignedAgentId).trim().toLowerCase() === agentIdNorm) return true;
+      const propAgentId = p.assignedAgentId ? String(p.assignedAgentId).trim().toLowerCase() : '';
+      // 1. Если у объекта явно задан assignedAgentId — доверяем ему строго
+      if (propAgentId && agentIdNorm) {
+        return propAgentId === agentIdNorm;
       }
 
-      // 2. По assignedAgentName
+      // 2. Fallback — по полному имени (assignedAgentName / agentName), без пересечения однофамильцев
       if (p.assignedAgentName && agent.name) {
         if (namesLikelyMatch(p.assignedAgentName, agent.name)) return true;
       }
 
-      // 3. По agentName из фида
       if (p.agentName && agent.name) {
         if (namesLikelyMatch(p.agentName, agent.name)) return true;
       }

@@ -4,6 +4,7 @@ import { Search, Phone, ShieldCheck, Award, MessageSquare, ArrowRight, Star } fr
 import { PageId, Agent } from '../types';
 import { brass, brassLight, paper, displayFont, useFonts, Reveal, CornerFrame, Eyebrow } from './DesignSystem';
 import { AgentBrandAvatar } from './AgentBrandAvatar';
+import { isRealtorAgent } from '@/lib/agentUtils';
 
 interface OurTeamPageProps {
   activePage?: PageId;
@@ -43,13 +44,7 @@ export default function OurTeamPage({
   // Хардкод из src/data.ts больше не используется.
   const sourcePool: Agent[] = Array.isArray(agentsList) ? agentsList : [];
 
-  const approvedAgents: Agent[] = sourcePool.filter((a: Agent) => {
-    if (!a || !a.name) return false;
-    if (a.isApproved === false) return false;
-    if (a.id === 'admin' || a.id === 'call-center') return false;
-    if (a.isDismissed || a.status === 'dismissed') return false;
-    return true;
-  });
+  const approvedAgents: Agent[] = sourcePool.filter(isRealtorAgent);
 
   const filteredAgents: Agent[] = approvedAgents.filter((agent: Agent) => {
     const matchesFilter =
@@ -75,7 +70,7 @@ export default function OurTeamPage({
       <div
         className="relative min-h-[85vh] flex items-center overflow-hidden"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=2000')`,
+          backgroundImage: `url('/photo/hero-teamwork.jpg')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}

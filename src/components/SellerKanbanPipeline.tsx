@@ -8,6 +8,7 @@ import {
   CheckCircle2, AlertTriangle, ArrowRight, MessageCircle, ExternalLink
 } from 'lucide-react';
 import { PublishSellerPropertyModal } from './PublishSellerPropertyModal';
+import { isRealtorAgent } from '../lib/agentUtils';
 
 interface SellerKanbanPipelineProps {
   sellersList: ColdSeller[];
@@ -671,7 +672,7 @@ export default function SellerKanbanPipeline({
                       className="bg-white border border-purple-300 text-xs font-bold text-purple-950 rounded-xl px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-purple-400"
                     >
                       <option value="">📥 Без назначения (в общий пул)</option>
-                      {agentsList.filter(a => !a.isDismissed && a.status !== 'dismissed' && !a.isAdmin && a.id !== 'admin' && a.id !== 'call-center').map(ag => (
+                      {agentsList.filter(isRealtorAgent).map(ag => (
                         <option key={ag.id} value={ag.name}>
                           👤 {ag.name} ({ag.role || 'Риэлтер'})
                         </option>

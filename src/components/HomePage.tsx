@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { PageId, Agent, Property, Review, Article } from '../types';
 import { AgentBrandAvatar } from './AgentBrandAvatar';
+import { isRealtorAgent } from '@/lib/agentUtils';
 import {
   Star, Search, MapPin, ArrowRight, ShieldCheck, Scale,
   FileCheck, Home, Clock, Award, Users, TrendingUp, CheckCircle, Phone,
@@ -791,7 +792,7 @@ export default function HomePage({
                 </h2>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {agentsList.slice(0, 6).map((agent) => (
+                  {agentsList.filter(isRealtorAgent).slice(0, 6).map((agent) => (
                     <div
                       key={agent.id}
                       onClick={() => { if (onViewProfile) onViewProfile(agent); else navigateTo('vybrat-agenta' as PageId); }}

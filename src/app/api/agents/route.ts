@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
     }
 
     const id = body.id || `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nameTokens = String(body.name).trim().split(/\s+/).filter(Boolean);
+    const derivedLastName = body.lastName ?? (nameTokens.length >= 2 ? nameTokens[0] : undefined);
+    const derivedFirstName = body.firstName ?? (nameTokens.length >= 2 ? nameTokens[1] : undefined);
+    const derivedPatronymic = body.patronymic ?? (nameTokens.length >= 3 ? nameTokens.slice(2).join(' ') : undefined);
 
     const hashedPassword =
       body.password && String(body.password).trim()
@@ -83,9 +87,9 @@ export async function POST(request: NextRequest) {
         assignedManagerName: body.assignedManagerName ?? undefined,
         agencyName: body.agencyName ?? 'ООО «АН Фаттория»',
         description: body.description ?? undefined,
-        firstName: body.firstName ?? undefined,
-        lastName: body.lastName ?? undefined,
-        patronymic: body.patronymic ?? undefined,
+        firstName: derivedFirstName,
+        lastName: derivedLastName,
+        patronymic: derivedPatronymic,
         objectsCount: Number(body.objectsCount ?? 0),
         userUuid: body.userUuid ?? undefined,
         userId: body.userId ?? undefined,
@@ -128,9 +132,9 @@ export async function POST(request: NextRequest) {
         body.assignedManagerName ?? null,
         body.agencyName ?? 'ООО «АН Фаттория»',
         body.description ?? null,
-        body.firstName ?? null,
-        body.lastName ?? null,
-        body.patronymic ?? null,
+        derivedFirstName ?? null,
+        derivedLastName ?? null,
+        derivedPatronymic ?? null,
         body.objectsCount ?? 0,
         body.userUuid ?? null,
         body.userId ?? null,

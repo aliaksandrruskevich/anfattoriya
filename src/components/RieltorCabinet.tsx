@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { AgentBrandAvatar } from './AgentBrandAvatar';
 import { checkMatch, findMatches, MatchResult } from '../utils/matchEngine';
+import { isSamePersonName } from '@/lib/agentUtils';
 
 interface RieltorCabinetProps {
   loggedInAgent: Agent;
@@ -40,15 +41,19 @@ export const RieltorCabinet: React.FC<RieltorCabinetProps> = ({
   const [editingBuyer, setEditingBuyer] = useState<Buyer | null>(null);
 
   const myObjects = useMemo(() => {
-    const agentNameLower = (loggedInAgent.name || '').toLowerCase().trim();
-    const agentLastName = agentNameLower.split(' ')[0] || '';
-    
-    return propertiesList.filter(p => {
-      if (p.assignedAgentId && p.assignedAgentId === loggedInAgent.id) return true;
-      if (!p.agentName) return false;
-      const propAgentLower = p.agentName.toLowerCase().trim();
-      if (propAgentLower === agentNameLower) return true;
-      if (agentLastName.length > 2 && propAgentLower.includes(agentLastName)) return true;
+    const myIdNorm = (loggedInAgent.id || '').trim().toLowerCase();
+
+    return propertiesList.filter((p) => {
+      const propAgentId = p.assignedAgentId ? String(p.assignedAgentId).trim().toLowerCase() : '';
+      if (propAgentId && myIdNorm) {
+        return propAgentId === myIdNorm;
+      }
+      if (p.assignedAgentName && isSamePersonName(p.assignedAgentName, loggedInAgent.name)) {
+        return true;
+      }
+      if (p.agentName && isSamePersonName(p.agentName, loggedInAgent.name)) {
+        return true;
+      }
       return false;
     });
   }, [propertiesList, loggedInAgent]);

@@ -67,9 +67,21 @@ export async function PUT(
     ];
     const allowed = isAdmin ? adminAllowed : selfAllowed;
 
+    const normalizedBody: Record<string, any> = { ...body };
+    if (body.name && typeof body.name === 'string') {
+      const tokens = body.name.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length >= 2) {
+        if (normalizedBody.lastName === undefined) normalizedBody.lastName = tokens[0];
+        if (normalizedBody.firstName === undefined) normalizedBody.firstName = tokens[1];
+        if (normalizedBody.patronymic === undefined && tokens.length >= 3) {
+          normalizedBody.patronymic = tokens.slice(2).join(' ');
+        }
+      }
+    }
+
     let hashedPassword: string | undefined = undefined;
-    if (body.password !== undefined && String(body.password).trim() !== '') {
-      hashedPassword = await bcrypt.hash(String(body.password).trim(), 10);
+    if (normalizedBody.password !== undefined && String(normalizedBody.password).trim() !== '') {
+      hashedPassword = await bcrypt.hash(String(normalizedBody.password).trim(), 10);
     }
 
     if (isDbMockMode()) {
@@ -81,10 +93,10 @@ export async function PUT(
       const current = { ...store.agents[idx] };
       let changed = false;
       for (const key of allowed) {
-        if (body[key] !== undefined) {
+        if (normalizedBody[key] !== undefined) {
           (current as any)[key] = ['isAdmin', 'isApproved', 'hasLeadsAccess', 'isDismissed'].includes(key)
-            ? Boolean(body[key])
-            : body[key];
+            ? Boolean(normalizedBody[key])
+            : normalizedBody[key];
           changed = true;
         }
       }
@@ -103,12 +115,12 @@ export async function PUT(
     const values: any[] = [];
 
     for (const key of allowed) {
-      if (body[key] !== undefined) {
+      if (normalizedBody[key] !== undefined) {
         fields.push(`${key} = ?`);
         if (['isAdmin', 'isApproved', 'hasLeadsAccess', 'isDismissed'].includes(key)) {
-          values.push(body[key] ? 1 : 0);
+          values.push(normalizedBody[key] ? 1 : 0);
         } else {
-          values.push(body[key]);
+          values.push(normalizedBody[key]);
         }
       }
     }

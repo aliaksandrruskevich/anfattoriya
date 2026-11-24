@@ -10,6 +10,7 @@ import {
   Building, Check, Flame, Clock, ShieldCheck, DollarSign, Coins, ExternalLink, Phone
 } from 'lucide-react';
 import { AgentBrandAvatar } from './AgentBrandAvatar';
+import { isRealtorAgent, isSamePersonName } from '@/lib/agentUtils';
 
 interface BuyersDatabasePageProps {
   activePage: PageId;
@@ -1283,7 +1284,12 @@ export default function BuyersDatabasePage({
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {getMatchingProperties(viewingMatchesBuyer).map((prop) => {
-                    const assignedAgent = agentsList.find(a => (prop.assignedAgentId && a.id === prop.assignedAgentId) || (prop.agentName && a.name === prop.agentName)) || agentsList[0];
+                    const realtorsPool = agentsList.filter(isRealtorAgent);
+                    const assignedAgent = realtorsPool.find((a) =>
+                      prop.assignedAgentId
+                        ? a.id === prop.assignedAgentId
+                        : isSamePersonName(prop.assignedAgentName || prop.agentName, a.name)
+                    );
                     return (
                       <div
                         key={prop.id}

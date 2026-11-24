@@ -4,6 +4,7 @@ import React from 'react';
 import ChooseAgentPage from '@/components/ChooseAgentPage';
 import { useApp } from '@/app/Providers';
 import { useRouter } from 'next/navigation';
+import { getAgentUrl } from '@/lib/routes';
 
 export default function Page() {
   const { agents, addLead } = useApp();
@@ -15,7 +16,8 @@ export default function Page() {
       activePage="vybrat-agenta" 
       navigateTo={nav} 
       handleAddLead={addLead} 
-      agentsList={agents} 
+      agentsList={agents}
+      onViewProfile={(a) => router.push(getAgentUrl(a))}
     />
   );
 }

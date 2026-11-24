@@ -6,6 +6,7 @@ import { Heart, Search } from 'lucide-react';
 import { Property, Agent } from '../types';
 import { AgentBrandAvatar } from './AgentBrandAvatar';
 import { WatermarkedImage } from './WatermarkedImage';
+import { extractNameTokens, isRealtorAgent, isSamePersonName, normalizePersonName } from '@/lib/agentUtils';
 
 const PropertyMap = dynamic(() => import('./PropertyMap'), {
   ssr: false,
@@ -27,36 +28,45 @@ const EMPTY_AGENT: Agent = {
 };
 
 export const resolveAgentForProperty = (prop: Property, agentPool: Agent[] = []): Agent => {
-  const pool = Array.isArray(agentPool) ? agentPool : [];
-  if (pool.length === 0) return EMPTY_AGENT;
+  const realtors = (Array.isArray(agentPool) ? agentPool : []).filter(isRealtorAgent);
 
   if (prop.assignedAgentId) {
-    const byId = pool.find((a) => a.id === prop.assignedAgentId);
+    const byId = realtors.find((a) => a.id === prop.assignedAgentId);
     if (byId) return byId;
   }
 
-  const rawName = prop.agentName || (prop as any).assignedAgentName;
+  const rawName = (prop as any).assignedAgentName || prop.agentName;
   if (rawName) {
-    const cleanTarget = rawName.toLowerCase().trim();
-    const found = pool.find((a) => {
-      const aName = a.name.toLowerCase().trim();
-      if (aName === cleanTarget || aName.includes(cleanTarget) || cleanTarget.includes(aName)) return true;
-      const aParts = aName.split(' ');
-      const tParts = cleanTarget.split(' ');
-      if (
-        aParts[0] &&
-        tParts[0] &&
-        (aParts[0] === tParts[0] || aParts[0].includes(tParts[0]) || tParts[0].includes(aParts[0]))
-      ) {
-        return true;
-      }
-      return false;
-    });
-    if (found) return found;
+    const cleanTarget = normalizePersonName(rawName);
+    const exactOrFull = realtors.find(
+      (a) =>
+        normalizePersonName(a.name) === cleanTarget ||
+        isSamePersonName(a.name, rawName) ||
+        (a.firstName && a.lastName && isSamePersonName(`${a.lastName} ${a.firstName}`, rawName))
+    );
+    if (exactOrFull) return exactOrFull;
+
+    // Если в объекте указана только фамилия (1 слово), сопоставляем только при уникальной фамилии
+    const tokens = extractNameTokens(rawName);
+    if (tokens.length === 1) {
+      const surnameMatches = realtors.filter((a) => {
+        const agentTokens = extractNameTokens(a.lastName || a.name);
+        return agentTokens[0] === tokens[0];
+      });
+      if (surnameMatches.length === 1) return surnameMatches[0];
+    }
+
+    return {
+      ...EMPTY_AGENT,
+      id: prop.assignedAgentId || 'realtor-external',
+      name: String(rawName),
+      phone: prop.agentPhone || EMPTY_AGENT.phone,
+      photo: prop.agentPhoto || EMPTY_AGENT.photo,
+      role: 'Риэлтер',
+    };
   }
 
-  const hash = (prop.id || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return pool[hash % pool.length] || EMPTY_AGENT;
+  return EMPTY_AGENT;
 };
 
 interface PropertyCatalogProps {

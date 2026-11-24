@@ -368,11 +368,11 @@ export const PATH_ALIASES: Record<string, PageId> = {
 
 export function getAgentSlug(agent: Agent): string {
   if (!agent) return '';
-  const parts = (agent.name || '').trim().split(/\s+/);
+  const parts = (agent.name || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
-    const surname = transliterateToSlug(parts[0]);
-    const firstName = transliterateToSlug(parts[1]);
-    return `${surname}-${firstName}`;
+    const firstWord = transliterateToSlug(parts[0]);
+    const secondWord = transliterateToSlug(parts[1]);
+    return `${firstWord}-${secondWord}`;
   }
   if (agent.id && agent.id.startsWith('agent-')) {
     return agent.id.replace('agent-', '');
@@ -396,33 +396,51 @@ export function resolveAgentFromSlug(slug: string, agentsList: Agent[]): Agent |
   if (!slug || !Array.isArray(agentsList) || agentsList.length === 0) return null;
   const clean = slug.toLowerCase().replace(/^\/+|\/+$/g, '').trim();
   const withoutPrefix = clean.replace(/^(rieltor-|realtor-|agent-|rieltor\/|realtor\/|agent\/|agents\/)/, '');
+  if (!withoutPrefix) return null;
 
+  // 1. Точное совпадение по ID
   const exactMatch = agentsList.find(a =>
     a.id.toLowerCase() === clean ||
     a.id.toLowerCase() === `agent-${withoutPrefix}` ||
-    a.id.toLowerCase().replace('agent-', '') === withoutPrefix
+    a.id.toLowerCase().replace(/^agent-/, '') === withoutPrefix
   );
   if (exactMatch) return exactMatch;
 
+  // 2. Точное совпадение по сгенерированному slug («фамилия-имя») или обратному («имя-фамилия»)
   const slugMatch = agentsList.find(a => {
     const s = getAgentSlug(a).toLowerCase();
-    return s === withoutPrefix || s === clean || `rieltor-${s}` === clean;
+    if (s === withoutPrefix || s === clean || `rieltor-${s}` === clean) return true;
+    const parts = (a.name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const reversedSlug = `${transliterateToSlug(parts[1])}-${transliterateToSlug(parts[0])}`;
+      if (reversedSlug === withoutPrefix) return true;
+    }
+    return false;
   });
   if (slugMatch) return slugMatch;
 
+  // 3. Точное совпадение транслитерации полного ФИО (включая отчество)
   const translitMatch = agentsList.find(a => {
     const tName = transliterateToSlug(a.name);
-    return tName === withoutPrefix || tName.includes(withoutPrefix) || withoutPrefix.includes(tName);
+    return tName === withoutPrefix;
   });
   if (translitMatch) return translitMatch;
 
-  const surnameMatch = agentsList.find(a => {
-    const s = (a.name || '').toLowerCase().trim().split(/\s+/)[0];
-    const sTranslit = transliterateToSlug(s);
-    return sTranslit === withoutPrefix || withoutPrefix.startsWith(sTranslit) || sTranslit.startsWith(withoutPrefix);
-  });
+  // 4. Односложный slug (только фамилия, без дефиса) — разрешаем ТОЛЬКО если фамилия уникальна среди всех агентов,
+  //    чтобы не объединять однофамильцев вроде Федорчук Светлана и Федорчук Антон.
+  if (!withoutPrefix.includes('-')) {
+    const surnameMatches = agentsList.filter(a => {
+      const firstToken = (a.name || '').toLowerCase().trim().split(/\s+/)[0] || '';
+      const lastToken = (a.lastName || '').toLowerCase().trim();
+      return (
+        (firstToken && transliterateToSlug(firstToken) === withoutPrefix) ||
+        (lastToken && transliterateToSlug(lastToken) === withoutPrefix)
+      );
+    });
+    if (surnameMatches.length === 1) return surnameMatches[0];
+  }
 
-  return surnameMatch || null;
+  return null;
 }
 
 // ============================================================

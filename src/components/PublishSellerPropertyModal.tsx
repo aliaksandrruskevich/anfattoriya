@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ColdSeller, Property, Agent } from '../types';
 import { X, Sparkles, Building, MapPin, DollarSign, FileSignature, CheckCircle, ExternalLink, Image, Tag, Eye } from 'lucide-react';
 import { getNbrbRate } from '../utils/exchangeRate';
+import { isRealtorAgent } from '../lib/agentUtils';
 
 interface PublishSellerPropertyModalProps {
   seller: ColdSeller;
@@ -369,7 +370,7 @@ export const PublishSellerPropertyModal: React.FC<PublishSellerPropertyModalProp
                   onChange={(e) => setAssignedAgentName(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-250 rounded-xl px-3 py-2 font-bold text-neutral-900 outline-none"
                 >
-                  {agentsList.filter(a => !a.isDismissed && !a.isAdmin && a.id !== 'admin' && a.id !== 'call-center').map(a => (
+                  {agentsList.filter(isRealtorAgent).map(a => (
                     <option key={a.id} value={a.name}>👤 {a.name}</option>
                   ))}
                 </select>

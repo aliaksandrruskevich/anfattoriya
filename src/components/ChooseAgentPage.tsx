@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { PageId, Agent } from '../types';
 import { Phone, Search, Clock, TrendingUp, Shield, X, Mail, Star, Award, MapPin, Building } from 'lucide-react';
 import { AgentBrandAvatar } from './AgentBrandAvatar';
+import { isRealtorAgent } from '@/lib/agentUtils';
 
 interface ChooseAgentPageProps {
   activePage: PageId;
@@ -20,7 +21,7 @@ export default function ChooseAgentPage({ navigateTo, handleAddLead, agentsList,
   const [filter, setFilter] = useState<'all' | 'sale' | 'rent' | 'assessment'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const approvedAgents = agentsList.filter(a => a.isApproved !== false && a.id !== 'admin' && !a.isDismissed && a.status !== 'dismissed');
+  const approvedAgents = agentsList.filter(isRealtorAgent);
 
   const filteredAgents = approvedAgents.filter(agent => {
     const matchesFilter = filter === 'all' || agent.specialization === filter || agent.specialization === 'all';

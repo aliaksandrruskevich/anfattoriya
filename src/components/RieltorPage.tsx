@@ -24,7 +24,7 @@ export default function RieltorPage({ activePage, navigateTo, handleAddLead }: P
       
       {/* БАННЕР */}
       <div className="relative min-h-screen flex items-center"
-        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=2000')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        style={{ backgroundImage: `url('/photo/rielter.jpg')`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div className="absolute inset-0 bg-black/40"></div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="max-w-4xl">

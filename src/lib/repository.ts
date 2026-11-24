@@ -1,6 +1,7 @@
 import { isDbMockMode, query, queryOne } from './db';
 import { getMockStore } from './mockStore';
 import { sanitizeAgentForClient } from './sanitize';
+import { isRealtorAgent } from './agentUtils';
 import type { Agent, Property, Review, Article, Lead, Buyer, ColdSeller, CRMTask } from '../types';
 
 /**
@@ -45,7 +46,7 @@ export async function getAgents(): Promise<Agent[]> {
   if (isDbMockMode()) {
     const store = getMockStore();
     return store.agents
-      .filter((a) => (a.status || 'active') === 'active' && !a.isDismissed)
+      .filter((a) => isRealtorAgent(a))
       .map((a) => ({
         ...sanitizeAgentForClient(a),
         objectsCount: store.properties.filter(
@@ -59,10 +60,13 @@ export async function getAgents(): Promise<Agent[]> {
        (SELECT COUNT(*) FROM properties p
         WHERE p.assignedAgentId = a.id AND p.status = 'active') AS objectsCount
      FROM agents a
-     WHERE a.status = 'active' AND a.isDismissed = 0
-     ORDER BY a.isAdmin DESC, a.dealsCount DESC, a.name ASC`
+     WHERE a.status = 'active'
+       AND a.isDismissed = 0
+       AND a.isAdmin = 0
+       AND a.id NOT IN ('admin', 'callcenter', 'call-center')
+     ORDER BY a.dealsCount DESC, a.name ASC`
   );
-  return rows.map(rowToAgent);
+  return rows.map(rowToAgent).filter(isRealtorAgent);
 }
 
 export async function getAllAgents(): Promise<Agent[]> {

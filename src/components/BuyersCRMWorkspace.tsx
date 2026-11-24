@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Agent, Buyer, CRMTask, Property } from '../types';
+import { isRealtorAgent, isSamePersonName } from '../lib/agentUtils';
 
 const BuyerSearchMatcher = dynamic(() => import('./BuyerSearchMatcher'), {
   ssr: false,
@@ -250,22 +251,19 @@ export default function BuyersCRMWorkspace({
   const isBuyerInAgentFilter = (buyer: Buyer): boolean => {
     if (isAgentAdmin || isAgentCallCenter) {
       if (!isAgentAdmin || selectedAgentFilter === 'all') return true;
-      const f = selectedAgentFilter.toLowerCase().trim();
       return (
-        (buyer.assignedAgentName || '').toLowerCase().includes(f) ||
-        (buyer.registeredBy || '').toLowerCase().includes(f)
+        buyer.assignedAgentId === selectedAgentFilter ||
+        isSamePersonName(buyer.assignedAgentName, selectedAgentFilter) ||
+        isSamePersonName(buyer.registeredBy, selectedAgentFilter)
       );
     }
     if (!loggedInAgent) return false;
-    const curName = (loggedInAgent.name || '').toLowerCase().trim();
     const curId = (loggedInAgent.id || '').trim();
     const agId = (buyer.assignedAgentId || '').trim();
-    const agName = (buyer.assignedAgentName || '').toLowerCase().trim();
-    const regBy = (buyer.registeredBy || '').toLowerCase().trim();
     return Boolean(
       (agId && agId === curId) ||
-      (agName && (agName === curName || agName.includes(curName) || curName.includes(agName))) ||
-      (regBy && (regBy === curName || regBy.includes(curName) || curName.includes(regBy)))
+      isSamePersonName(buyer.assignedAgentName, loggedInAgent.name) ||
+      isSamePersonName(buyer.registeredBy, loggedInAgent.name)
     );
   };
 
@@ -1377,7 +1375,7 @@ export default function BuyersCRMWorkspace({
                       >
                         <option value="">— По умолчанию ({drawerBuyer.registeredBy}) —</option>
                         {agentsList
-                          .filter((a) => !a.isDismissed && a.status !== 'dismissed')
+                          .filter(isRealtorAgent)
                           .map((a) => (
                             <option key={a.id} value={a.id}>
                               {a.name} ({a.role})
@@ -1643,7 +1641,7 @@ export default function BuyersCRMWorkspace({
                   >
                     <option value="">Закрепить за мной ({loggedInAgent?.name || 'Администратор'})</option>
                     {agentsList
-                      .filter((a) => !a.isDismissed && a.status !== 'dismissed')
+                      .filter(isRealtorAgent)
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.name} ({a.role})
