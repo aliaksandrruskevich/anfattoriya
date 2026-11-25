@@ -1,62 +1,83 @@
 /**
- * Kufar Messaging Scraper (Puppeteer) for Fattoria CRM
+ * Kufar Messaging Sync (HTTP API eapi.kufar.by) for Fattoria CRM
  *
- * Достаточно указать в файле .env только логин и пароль:
+ * Работает без браузера (Puppeteer вынесен в scripts/kufar-parser-browser.ts).
+ * Подходит для запуска по cron на хостинге CloudLinux/LVE.
+ *
+ * Переменные .env:
  *   KUFAR_LOGIN=...
  *   KUFAR_PASSWORD=...
+ *   CRM_API_URL=https://ваш-домен.by   (по умолчанию http://localhost:3000)
+ *   KUFAR_SYNC_SECRET=...
+ *
+ * Опционально:
+ *   KUFAR_TOKEN_PATH=kufar-token.json
+ *   KUFAR_POLL_INTERVAL_MS=90000       (в --watch режиме минимум 60000 мс)
+ *   KUFAR_CONV_LIMIT=30                (1..99)
+ *   KUFAR_MSG_LIMIT=50                 (1..99)
  *
  * Запуск:
  *   npx tsx scripts/kufar-parser.ts
- *   npx tsx scripts/kufar-parser.ts --watch   (опрос каждые 30 секунд)
+ *   npx tsx scripts/kufar-parser.ts --watch
  */
 
 import dotenv from 'dotenv';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {
+  KufarApiClient,
+  KufarAuthError,
+  type KufarApiMessage,
+  type KufarConversationSummary,
+} from './kufar-api-client';
+import { extractBelarusPhone, extractKufarAdId } from '../src/lib/kufarUtils';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-interface ScrapedMessage {
+export interface ScrapedMessage {
   chatId: string;
   kufarAdId?: string;
   adUrl?: string;
   adTitle?: string;
   clientName: string;
+  client_phone?: string;
   sender: 'client' | 'agent';
   text: string;
   createdAt: string;
   externalMessageId: string;
 }
 
-const CRM_API_URL = (process.env.CRM_API_URL || 'http://localhost:3000').replace(/\/$/, '');
-const COOKIES_PATH = path.resolve(
-  process.cwd(),
-  process.env.KUFAR_COOKIES_PATH || 'kufar-cookies.json'
-);
+const CRM_API_URL = (process.env.CRM_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
 const STATE_PATH = path.resolve(process.cwd(), 'scripts/.kufar-sync-state.json');
-const POLL_INTERVAL_MS = Number(process.env.KUFAR_POLL_INTERVAL_MS || 30000);
+const LOCK_PATH = path.resolve(process.cwd(), 'scripts/.kufar-parser.lock');
 const WATCH_MODE = process.argv.includes('--watch');
 
-const KUFAR_LOGIN = (
-  process.env.KUFAR_LOGIN ||
-  process.env.KUFAR_EMAIL ||
-  process.env.KUFAR_PHONE ||
-  process.env.KUFAR_USER ||
-  process.env.KUFAR_USERNAME ||
-  ''
-).trim();
+const MIN_POLL_INTERVAL_MS = 60_000;
+const DEFAULT_POLL_INTERVAL_MS = 90_000;
+const CRM_TIMEOUT_MS = 15_000;
 
-const KUFAR_PASSWORD = (
-  process.env.KUFAR_PASSWORD ||
-  process.env.KUFAR_PASS ||
-  ''
-).trim();
+function resolvePollIntervalMs(): number {
+  const raw = Number(process.env.KUFAR_POLL_INTERVAL_MS || DEFAULT_POLL_INTERVAL_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_POLL_INTERVAL_MS;
+  return Math.max(MIN_POLL_INTERVAL_MS, Math.trunc(raw));
+}
+
+function resolveLimit(envValue: string | undefined, fallback: number): number {
+  const parsed = Number(envValue || fallback);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(99, Math.max(1, Math.trunc(parsed)));
+}
+
+const POLL_INTERVAL_MS = resolvePollIntervalMs();
+const CONV_LIMIT = resolveLimit(process.env.KUFAR_CONV_LIMIT, 30);
+const MSG_LIMIT = resolveLimit(process.env.KUFAR_MSG_LIMIT, 50);
 
 function getSyncToken(): string {
   const explicit = (process.env.KUFAR_SYNC_SECRET || '').trim();
   if (explicit) return explicit;
-  const seed = KUFAR_PASSWORD || process.env.SESSION_SECRET || '';
+  const password = (process.env.KUFAR_PASSWORD || process.env.KUFAR_PASS || '').trim();
+  const seed = password || process.env.SESSION_SECRET || '';
   return seed
     ? crypto.createHmac('sha256', seed).update('fattoria-kufar-sync').digest('hex')
     : '';
@@ -66,140 +87,69 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function loadCookiesOptional(): Promise<any[] | null> {
+function isProcessAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
-    const raw = await fs.readFile(COOKIES_PATH, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    return parsed.map((c) => ({
-      ...c,
-      domain: c.domain || '.kufar.by',
-      path: c.path || '/',
-    }));
-  } catch {
-    return null;
+    process.kill(pid, 0);
+    return true;
+  } catch (err: any) {
+    return err?.code === 'EPERM';
   }
 }
 
-async function saveCookies(page: any): Promise<void> {
-  try {
-    const cookies = await page.cookies();
-    if (Array.isArray(cookies) && cookies.length > 0) {
-      await fs.writeFile(COOKIES_PATH, JSON.stringify(cookies, null, 2), {
-        encoding: 'utf-8',
-        mode: 0o600,
-      });
-    }
-  } catch {
-    // ignore
-  }
-}
+async function acquireLock(): Promise<boolean> {
+  await fs.mkdir(path.dirname(LOCK_PATH), { recursive: true });
 
-async function dismissCookieBanner(page: any): Promise<void> {
-  await page
-    .evaluate(() => {
-      const closeBtn = document.querySelector('[data-testid="popup-close"]') as HTMLElement | null;
-      if (closeBtn) closeBtn.click();
-      const btns = Array.from(document.querySelectorAll('button'));
-      const accept = btns.find((b) =>
-        /^(принять|согласиться|принять все|ok|хорошо)$/i.test((b.innerText || '').trim())
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const handle = await fs.open(LOCK_PATH, 'wx', 0o600);
+      await handle.writeFile(
+        JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }),
+        'utf8'
       );
-      if (accept) (accept as HTMLElement).click();
-    })
-    .catch(() => {});
-}
+      await handle.close();
+      return true;
+    } catch (err: any) {
+      if (err?.code !== 'EEXIST') throw err;
 
-async function isMessagingAuthenticated(page: any): Promise<boolean> {
-  return await page.evaluate(() => {
-    const hasLoginBtn = Boolean(document.querySelector('[data-testid="login_button"]'));
-    const hasGuestBtn = Array.from(document.querySelectorAll('button')).some(
-      (b) => (b.innerText || '').trim() === 'Войти'
-    );
-    const hasPassInput = Boolean(document.querySelector('input[name="password"], input[type="password"]'));
-    return !hasLoginBtn && !hasGuestBtn && !hasPassInput;
-  });
-}
+      let existingPid = 0;
+      try {
+        const raw = await fs.readFile(LOCK_PATH, 'utf8');
+        const parsed = JSON.parse(raw) as { pid?: unknown };
+        existingPid = typeof parsed?.pid === 'number' ? parsed.pid : 0;
+      } catch {
+        existingPid = 0;
+      }
 
-async function loginToKufar(page: any): Promise<void> {
-  if (!KUFAR_LOGIN || !KUFAR_PASSWORD) {
-    throw new Error('Укажите KUFAR_LOGIN и KUFAR_PASSWORD в файле .env.');
-  }
+      if (existingPid > 0 && existingPid !== process.pid && isProcessAlive(existingPid)) {
+        return false;
+      }
 
-  console.log('[Kufar Parser] Вхожу на Kufar по логину и паролю из .env...');
-
-  await page.goto('https://www.kufar.by/l', { waitUntil: 'domcontentloaded', timeout: 45000 });
-  await sleep(2500);
-  await dismissCookieBanner(page);
-  await sleep(600);
-
-  const loginBtn = await page.$('[data-testid="login_button"]');
-  if (loginBtn) {
-    await loginBtn.click().catch(() => {});
-    await sleep(2000);
-  }
-
-  let hasLoginInput = await page.$('input[name="login"]');
-  if (!hasLoginInput) {
-    await page.goto('https://www.kufar.by/l?login_popup=1', {
-      waitUntil: 'domcontentloaded',
-      timeout: 45000,
-    });
-    await sleep(2500);
-    await dismissCookieBanner(page);
-    await sleep(800);
-    const popupBtn = await page.$('[data-testid="login_button"]');
-    if (popupBtn) {
-      await popupBtn.click().catch(() => {});
-      await sleep(1800);
+      // Устаревший lock-файл от завершившегося процесса
+      await fs.unlink(LOCK_PATH).catch(() => {});
     }
-    hasLoginInput = await page.$('input[name="login"]');
   }
 
-  const loginSelector = hasLoginInput
-    ? 'input[name="login"]'
-    : 'input[name="email"], input[type="email"], input[autocomplete="username"]';
+  return false;
+}
 
-  await page.waitForSelector(loginSelector, { visible: true, timeout: 15000 });
-  await page.click(loginSelector, { clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await page.type(loginSelector, KUFAR_LOGIN, { delay: 30 });
-
-  const passSelector = 'input[name="password"], input[type="password"]';
-  await page.waitForSelector(passSelector, { visible: true, timeout: 10000 });
-  await page.click(passSelector, { clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await page.type(passSelector, KUFAR_PASSWORD, { delay: 30 });
-
-  await page.evaluate(() => {
-    const passEl = document.querySelector('input[name="password"], input[type="password"]');
-    const form = passEl?.closest('form');
-    const submitBtn =
-      (form?.querySelector('button[type="submit"]') as HTMLElement | null) ||
-      (Array.from(document.querySelectorAll('button[type="submit"]')).find(
-        (b) => /войти|вход/i.test((b as HTMLElement).innerText || '')
-      ) as HTMLElement | undefined);
-    if (submitBtn) submitBtn.click();
-  });
-
-  await sleep(4000);
-  await page
-    .goto('https://www.kufar.by/account/messaging/', { waitUntil: 'networkidle2', timeout: 45000 })
-    .catch(() => {});
-  await sleep(2500);
-
-  if (!(await isMessagingAuthenticated(page))) {
-    throw new Error('Не удалось подтвердить вход на Kufar по данным из .env.');
+async function releaseLock(): Promise<void> {
+  try {
+    const raw = await fs.readFile(LOCK_PATH, 'utf8');
+    const parsed = JSON.parse(raw) as { pid?: unknown };
+    if (parsed?.pid === process.pid) {
+      await fs.unlink(LOCK_PATH).catch(() => {});
+    }
+  } catch {
+    // lock уже удалён
   }
-
-  await saveCookies(page);
-  console.log('[Kufar Parser] Вход на Kufar выполнен успешно!');
 }
 
 async function loadSyncedIds(): Promise<Set<string>> {
   try {
-    const raw = await fs.readFile(STATE_PATH, 'utf-8');
+    const raw = await fs.readFile(STATE_PATH, 'utf8');
     const arr = JSON.parse(raw);
-    return new Set(Array.isArray(arr) ? arr : []);
+    return new Set(Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : []);
   } catch {
     return new Set();
   }
@@ -207,16 +157,92 @@ async function loadSyncedIds(): Promise<Set<string>> {
 
 async function saveSyncedIds(ids: Set<string>): Promise<void> {
   const recent = Array.from(ids).slice(-5000);
-  await fs.writeFile(STATE_PATH, JSON.stringify(recent, null, 2), 'utf-8');
+  await fs.mkdir(path.dirname(STATE_PATH), { recursive: true });
+  await fs.writeFile(STATE_PATH, JSON.stringify(recent, null, 2), {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
 }
 
-function buildMessageHash(chatId: string, sender: string, text: string, index: number): string {
-  const normalized = `${chatId}::${sender}::${text.trim()}::${index}`;
-  let hash = 0;
-  for (let i = 0; i < normalized.length; i++) {
-    hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
+function buildFallbackMessageId(
+  chatId: string,
+  sender: 'client' | 'agent',
+  createdAt: string,
+  text: string
+): string {
+  const hash = crypto
+    .createHash('sha256')
+    .update(`${chatId}::${sender}::${createdAt}::${text.trim()}`)
+    .digest('hex')
+    .slice(0, 16);
+  return `kf-${chatId}-${hash}`;
+}
+
+function normalizeIsoDate(rawDate: string | null | undefined): string {
+  if (!rawDate) return new Date().toISOString();
+  const ts = Date.parse(rawDate);
+  if (Number.isNaN(ts)) return new Date().toISOString();
+  return new Date(ts).toISOString();
+}
+
+function resolveSender(
+  msg: KufarApiMessage,
+  partnerId: number | string | null | undefined
+): 'client' | 'agent' {
+  if (partnerId !== undefined && partnerId !== null && msg.sender_id !== undefined && msg.sender_id !== null) {
+    return String(msg.sender_id) === String(partnerId) ? 'client' : 'agent';
   }
-  return `kf-${chatId}-${hash.toString(16)}`;
+  return 'client';
+}
+
+function mapApiMessageToScraped(
+  conv: KufarConversationSummary,
+  msg: KufarApiMessage,
+  partnerId: number | string | null | undefined,
+  adIdRaw: number | string | null | undefined,
+  adLinkRaw: string | null | undefined,
+  subjectRaw: string | null | undefined,
+  partnerNameRaw: string | null | undefined
+): ScrapedMessage | null {
+  const text = String(msg.text || '').trim();
+  if (!text) return null;
+
+  const conversationId = String(conv.conversation_id || '').trim();
+  if (!conversationId) return null;
+
+  const chatId = `kufar-${conversationId}`;
+  const sender = resolveSender(msg, partnerId);
+  const createdAt = normalizeIsoDate(msg.date);
+
+  const adUrl = (adLinkRaw || '').trim() || undefined;
+  const kufarAdId =
+    (adIdRaw !== undefined && adIdRaw !== null && String(adIdRaw).trim()) ||
+    extractKufarAdId(adUrl) ||
+    extractKufarAdId(text) ||
+    undefined;
+  const finalAdUrl = adUrl || (kufarAdId ? `https://www.kufar.by/item/${kufarAdId}` : undefined);
+
+  const clientName = (partnerNameRaw || 'Клиент Kufar').trim() || 'Клиент Kufar';
+  const adTitle = (subjectRaw || '').trim() || undefined;
+
+  const externalMessageId = msg.message_id
+    ? `kf-${conversationId}-${String(msg.message_id).trim()}`
+    : buildFallbackMessageId(chatId, sender, createdAt, text);
+
+  const clientPhone = sender === 'client' ? extractBelarusPhone(text) || undefined : undefined;
+
+  return {
+    chatId,
+    kufarAdId,
+    adUrl: finalAdUrl,
+    adTitle,
+    clientName,
+    ...(clientPhone ? { client_phone: clientPhone } : {}),
+    sender,
+    text,
+    createdAt,
+    externalMessageId,
+  };
 }
 
 async function sendToCrm(messages: ScrapedMessage[]): Promise<void> {
@@ -228,193 +254,163 @@ async function sendToCrm(messages: ScrapedMessage[]): Promise<void> {
     headers['x-sync-secret'] = token;
   }
 
-  const res = await fetch(`${CRM_API_URL}/api/chats/sync`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ messages }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CRM_TIMEOUT_MS);
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}: ${errText}`);
+  try {
+    const res = await fetch(`${CRM_API_URL}/api/chats/sync`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ messages }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`CRM HTTP ${res.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = (await res.json()) as { processed?: number; createdChats?: number };
+    console.log(
+      `[Kufar Parser] Синхронизировано сообщений: ${data.processed ?? messages.length}, новых чатов: ${data.createdChats ?? 0}`
+    );
+  } finally {
+    clearTimeout(timer);
   }
-
-  const data = await res.json();
-  console.log(
-    `[Kufar Parser] Синхронизировано сообщений: ${data.processed ?? messages.length}, новых чатов: ${data.createdChats ?? 0}`
-  );
 }
 
-async function scrapeKufarOnce(page: any, syncedIds: Set<string>): Promise<void> {
-  await page
-    .goto('https://www.kufar.by/account/messaging/', { waitUntil: 'networkidle2', timeout: 45000 })
-    .catch(() => {});
-  await sleep(2500);
-
-  if (!(await isMessagingAuthenticated(page))) {
-    await loginToKufar(page);
-  } else {
-    await saveCookies(page);
-  }
-
-  await page.waitForSelector('a[href*="/account/messaging/"]', { timeout: 12000 }).catch(() => {});
-
-  const dialogLinks: { href: string; clientName: string; adTitle: string }[] = await page.evaluate(() => {
-    const items: { href: string; clientName: string; adTitle: string }[] = [];
-    const anchors = Array.from(
-      document.querySelectorAll('a[href*="/account/messaging/"]')
-    ) as HTMLAnchorElement[];
-
-    for (const a of anchors) {
-      const href = a.href;
-      if (!href || items.some((x) => x.href === href)) continue;
-      const lines = (a.innerText || '')
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      items.push({
-        href,
-        clientName: lines[0] || 'Клиент Kufar',
-        adTitle: lines[1] || '',
-      });
-    }
-    return items.slice(0, 30);
-  });
-
-  console.log(`[Kufar Parser] Найдено диалогов: ${dialogLinks.length}`);
+export async function syncKufarOnce(
+  client: KufarApiClient,
+  syncedIds: Set<string>
+): Promise<number> {
+  const listResp = await client.getConversations(CONV_LIMIT, 0);
+  const conversations = Array.isArray(listResp?.conversations) ? listResp.conversations : [];
+  console.log(`[Kufar Parser] Получено диалогов: ${conversations.length}`);
 
   const newMessages: ScrapedMessage[] = [];
+  const seenInBatch = new Set<string>();
 
-  for (const dialog of dialogLinks) {
+  for (const conv of conversations) {
+    if (!conv?.conversation_id) continue;
+
     try {
-      await page.goto(dialog.href, { waitUntil: 'networkidle2', timeout: 45000 }).catch(() => {});
-      await sleep(1200);
+      const detail = await client.getConversationMessages(conv.conversation_id, MSG_LIMIT, 0);
+      const messages = Array.isArray(detail?.messages) ? detail.messages : [];
 
-      const chatMatch = dialog.href.match(/\/account\/messaging\/([^/?#]+)/i);
-      const chatId = chatMatch?.[1] ? `kufar-${chatMatch[1]}` : `kufar-${Date.now()}`;
+      const partnerId = detail?.partner_id ?? conv.partner_id;
+      const adId = detail?.ad_id ?? conv.ad_id;
+      const adLink = detail?.ad_link ?? conv.ad_link;
+      const subject = detail?.subject ?? conv.subject;
+      const partnerName = detail?.partner_name ?? conv.partner_name;
 
-      const extracted = await page.evaluate(() => {
-        const adAnchor = document.querySelector(
-          'a[href*="/item/"], a[href*="re.kufar.by"]'
-        ) as HTMLAnchorElement | null;
-        const adUrl = adAnchor?.href || '';
-        const adTitle = adAnchor?.innerText?.trim() || '';
+      for (const m of messages) {
+        const mapped = mapApiMessageToScraped(
+          conv,
+          m,
+          partnerId,
+          adId,
+          adLink,
+          subject,
+          partnerName
+        );
+        if (!mapped) continue;
 
-        const headerEl = document.querySelector(
-          'h1, h2, [data-testid*="user-name"], [class*="companion"], [class*="opponent"]'
-        ) as HTMLElement | null;
-        const clientName = headerEl?.innerText?.trim() || '';
-
-        const msgNodes = Array.from(
-          document.querySelectorAll(
-            '[data-testid*="message"], [class*="message-item"], [class*="messageBubble"], [class*="bubble"]'
-          )
-        ) as HTMLElement[];
-
-        const msgs = msgNodes
-          .map((el) => {
-            const text = (el.innerText || '').trim();
-            if (!text) return null;
-
-            const cls = (el.className || '').toLowerCase();
-            const testId = (el.getAttribute('data-testid') || '').toLowerCase();
-            const styleAlign = window.getComputedStyle(el).alignSelf;
-            const isAgent =
-              cls.includes('outgoing') ||
-              cls.includes('own') ||
-              cls.includes('self') ||
-              cls.includes('sent') ||
-              testId.includes('outgoing') ||
-              styleAlign === 'flex-end';
-
-            return { sender: isAgent ? ('agent' as const) : ('client' as const), text };
-          })
-          .filter(Boolean) as { sender: 'client' | 'agent'; text: string }[];
-
-        return { adUrl, adTitle, clientName, msgs };
-      });
-
-      const adIdMatch = extracted.adUrl.match(/\/(\d{5,15})(?:[/?#]|$)/);
-      const kufarAdId = adIdMatch?.[1];
-      const finalClientName = extracted.clientName || dialog.clientName || 'Клиент Kufar';
-      const finalAdTitle = extracted.adTitle || dialog.adTitle || undefined;
-
-      extracted.msgs.forEach((m, idx) => {
-        const extId = buildMessageHash(chatId, m.sender, m.text, idx);
-        if (!syncedIds.has(extId)) {
-          syncedIds.add(extId);
-          newMessages.push({
-            chatId,
-            kufarAdId,
-            adUrl: extracted.adUrl || undefined,
-            adTitle: finalAdTitle,
-            clientName: finalClientName,
-            sender: m.sender,
-            text: m.text,
-            createdAt: new Date().toISOString(),
-            externalMessageId: extId,
-          });
+        if (!syncedIds.has(mapped.externalMessageId) && !seenInBatch.has(mapped.externalMessageId)) {
+          seenInBatch.add(mapped.externalMessageId);
+          newMessages.push(mapped);
         }
-      });
+      }
     } catch (err: any) {
-      console.warn(`[Kufar Parser] Ошибка чтения диалога ${dialog.href}:`, err.message);
+      if (err instanceof KufarAuthError) {
+        throw err;
+      }
+      const msg = client.sanitizeText(err?.message || String(err));
+      console.warn(`[Kufar Parser] Ошибка чтения диалога ${conv.conversation_id}: ${msg}`);
     }
   }
 
-  if (newMessages.length > 0) {
-    await sendToCrm(newMessages);
-    await saveSyncedIds(syncedIds);
-  } else {
+  if (newMessages.length === 0) {
     console.log('[Kufar Parser] Новых сообщений нет.');
+    return 0;
   }
+
+  newMessages.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+
+  // Фиксируем syncedIds строго ПОСЛЕ успешного ответа CRM
+  await sendToCrm(newMessages);
+  for (const m of newMessages) {
+    syncedIds.add(m.externalMessageId);
+  }
+  await saveSyncedIds(syncedIds);
+
+  return newMessages.length;
 }
 
 async function main() {
-  const cookies = await loadCookiesOptional();
-  if (!cookies && (!KUFAR_LOGIN || !KUFAR_PASSWORD)) {
+  const client = new KufarApiClient();
+  if (!client.hasCredentials()) {
     console.error('[Kufar Parser] Укажите KUFAR_LOGIN и KUFAR_PASSWORD в файле .env.');
     process.exit(1);
   }
 
-  const syncedIds = await loadSyncedIds();
-  const puppeteer = (await import('puppeteer')).default;
+  if (!getSyncToken()) {
+    console.warn(
+      '[Kufar Parser] Предупреждение: не задан KUFAR_SYNC_SECRET — запросы к /api/chats/sync могут быть отклонены с 401.'
+    );
+  }
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  const locked = await acquireLock();
+  if (!locked) {
+    console.log('[Kufar Parser] Предыдущий запуск ещё выполняется (lock активен). Пропускаю.');
+    return;
+  }
+
+  let shouldStop = false;
+  const handleSignal = async (signal: string) => {
+    shouldStop = true;
+    console.log(`[Kufar Parser] Получен сигнал ${signal}, завершаю работу...`);
+    await releaseLock();
+    process.exit(0);
+  };
+
+  process.once('SIGINT', () => void handleSignal('SIGINT'));
+  process.once('SIGTERM', () => void handleSignal('SIGTERM'));
 
   try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1366, height: 900 });
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-    );
-    if (cookies) {
-      await page.setCookie(...cookies);
-    }
-
-    await scrapeKufarOnce(page, syncedIds);
+    const syncedIds = await loadSyncedIds();
+    await syncKufarOnce(client, syncedIds);
 
     if (WATCH_MODE) {
-      console.log(`[Kufar Parser] Режим наблюдения активен (интервал ${POLL_INTERVAL_MS} мс)...`);
-      while (true) {
+      console.log(
+        `[Kufar Parser] Режим наблюдения активен (интервал ${POLL_INTERVAL_MS} мс)...`
+      );
+      while (!shouldStop) {
         await sleep(POLL_INTERVAL_MS);
+        if (shouldStop) break;
         try {
-          await scrapeKufarOnce(page, syncedIds);
+          await syncKufarOnce(client, syncedIds);
         } catch (err: any) {
-          console.error('[Kufar Parser] Ошибка цикла опроса:', err.message);
+          const msg = client.sanitizeText(err?.message || String(err));
+          console.error(`[Kufar Parser] Ошибка цикла опроса: ${msg}`);
         }
       }
     }
   } finally {
-    if (!WATCH_MODE) {
-      await browser.close();
-    }
+    await releaseLock();
   }
 }
 
-main().catch((err) => {
-  console.error('[Kufar Parser] Критическая ошибка:', err);
-  process.exit(1);
-});
+const isDirectExecution =
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+
+if (isDirectExecution) {
+  main().catch(async (err) => {
+    const rawMsg = err?.message || String(err);
+    console.error('[Kufar Parser] Критическая ошибка:', rawMsg);
+    await releaseLock();
+    process.exit(1);
+  });
+}

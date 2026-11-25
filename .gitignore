@@ -11,7 +11,9 @@ build/
 .env.*
 !.env.example
 kufar-cookies.json
+kufar-token.json
 scripts/.kufar-sync-state.json
+scripts/.kufar-parser.lock
 
 # Бэкапы и дампы (ВАЖНО!)
 *.bak

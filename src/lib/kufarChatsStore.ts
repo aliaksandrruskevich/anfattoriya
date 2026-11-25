@@ -279,6 +279,7 @@ export interface SyncKufarPayload {
   adTitle?: string;
   clientName?: string;
   clientPhone?: string;
+  client_phone?: string;
   sender?: 'client' | 'agent';
   text: string;
   createdAt?: string;
@@ -294,7 +295,12 @@ export async function syncKufarIncomingMessage(payload: SyncKufarPayload): Promi
   const cleanText = String(payload.text || '').trim();
   const sender: 'client' | 'agent' = payload.sender === 'agent' ? 'agent' : 'client';
   const adId = payload.kufarAdId || extractKufarAdId(payload.adUrl || '') || extractKufarAdId(cleanText);
-  const extractedPhone = payload.clientPhone || extractBelarusPhone(cleanText);
+  const rawProvidedPhone = (payload.client_phone ?? payload.clientPhone ?? '').trim();
+  const normalizedProvidedPhone = rawProvidedPhone
+    ? extractBelarusPhone(rawProvidedPhone) || rawProvidedPhone
+    : null;
+  const extractedPhone =
+    normalizedProvidedPhone || (sender === 'client' ? extractBelarusPhone(cleanText) : null);
   const clientName = (payload.clientName || 'Клиент Kufar').trim();
   const nowIso = payload.createdAt || new Date().toISOString();
 
