@@ -1,31 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Cormorant_Garamond, Raleway } from 'next/font/google';
 import Script from 'next/script';
 import ClientLayout from './ClientLayout';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin', 'cyrillic'],
-  display: 'swap',
-  variable: '--font-inter',
-});
-
-// Fraunces заменён на Cormorant_Garamond — у Fraunces баг с Turbopack
-// и нет поддержки кириллицы. Переменная --font-fraunces сохранена,
-// чтобы существующие CSS-стили продолжали работать.
-const fraunces = Cormorant_Garamond({
-  subsets: ['latin', 'cyrillic'],
-  display: 'swap',
-  variable: '--font-fraunces',
-  weight: ['400', '500', '600'],
-});
-
-const raleway = Raleway({
-  subsets: ['latin', 'cyrillic'],
-  display: 'swap',
-  variable: '--font-raleway',
-  weight: ['400', '500', '600', '700', '800'],
-});
+// Мы убрали next/font/google, чтобы сборка не падала.
+// Шрифты теперь подключаются через обычный CSS в globals.css.
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -59,8 +38,6 @@ export const metadata: Metadata = {
       'max-video-preview': -1,
     },
   },
-  // ВНИМАНИЕ: alternates.canonical УБРАН.
-  // Canonical ставится в каждой page.tsx отдельно, чтобы избежать дублей.
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -87,8 +64,6 @@ export const metadata: Metadata = {
         alt: 'АН Фаттория — агентство недвижимости',
       },
     ],
-    // url УБРАН — он ставил всем страницам https://fattoria.by,
-    // что путало Google при индексации
   },
   twitter: {
     card: 'summary_large_image',
@@ -151,9 +126,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const isProduction = process.env.NODE_ENV === 'production';
 
   return (
-    <html lang="ru" className={`${inter.variable} ${fraunces.variable} ${raleway.variable}`}>
+    <html lang="ru" className="font-sans">
       <head>
-        {/* next/font автоматически добавляет preconnect к fonts.googleapis.com и fonts.gstatic.com */}
         <link rel="preconnect" href="https://files.realt.by" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://files.realt.by" />
 
@@ -162,7 +136,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(MAIN_SCHEMA) }}
         />
       </head>
-      <body className={inter.className}>
+      <body>
         <ClientLayout>{children}</ClientLayout>
 
         {isProduction && (

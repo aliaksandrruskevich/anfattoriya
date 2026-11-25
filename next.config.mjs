@@ -1,7 +1,6 @@
 import 'dotenv/config';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
   reactStrictMode: true,
   serverExternalPackages: ['puppeteer'],
 
